@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Itim&family=Kanit:wght@300;400;600;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
   <style>
     body {
@@ -50,8 +51,8 @@
       <div class="mt-8 p-4 bg-pink-100 rounded-xl text-left border-2 border-pink-300">
         <h3 class="font-bold text-pink-600 mb-1">💡 วิธีเล่นเบื้องต้น:</h3>
         <p class="text-sm text-gray-700">1. ถอยห่างกล้อง 2 เมตร ให้กล้องเห็นหัวถึงเอว</p>
-        <p class="text-sm text-gray-700">2. ใช้มือซ้ายหรือขวายื่นแตะกล่องคำตอบลอยไปมาบนจอ</p>
-        <p class="text-sm text-gray-700">3. ค้างมือไว้ในกล่องคำตอบ 0.5 วินาที เพื่อตอบคำถาม</p>
+        <p class="text-sm text-gray-700">2. ยื่นมือไปที่จรวดคำตอบที่ต้องการ 🚀</p>
+        <p class="text-sm text-gray-700">3. กำมือ ✊ เพื่อ "จับ" เลือกคำตอบนั้น (คลายมือก่อนถึงจับใหม่ได้)</p>
       </div>
     </div>
   </div>
@@ -329,9 +330,14 @@
 
     let cameraInstance = null;
     let poseInstance = null;
+    let handsInstance = null;
     let isPoseModelLoaded = false;
     let rawLandmarks = null;
     let isPoseInFrame = false;
+
+    // === ข้อมูลจากโมเดล Hands (ตรวจนิ้ว/การกำมือ) ===
+    let handCursors = [];      // [{x, y, isFist, isLeft}] พิกัดบนจอ + สถานะกำมือ
+    let handsReady = false;    // โหลดโมเดล Hands สำเร็จหรือไม่ (ถ้าไม่สำเร็จ = ใช้โหมดแตะค้างแทน)
 
     let lastInferenceTime = 0;
     let activeVideoWidth = 480;
@@ -350,8 +356,32 @@
           minTrackingConfidence: 0.5
         });
         poseInstance.onResults(onPoseResults);
+
+        // === โมเดล Hands: ตรวจจับมือ + นิ้ว เพื่อรู้ว่ากำมือหรือไม่ ===
+        try {
+          handsInstance = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+          });
+          handsInstance.setOptions({
+            maxNumHands: 2,
+            modelComplexity: 0,        // 0 = เบา เหมาะกับแท็บเล็ต
+            minDetectionConfidence: 0.6,
+            minTrackingConfidence: 0.6
+          });
+          handsInstance.onResults(onHandsResults);
+          handsReady = true;
+        } catch (handErr) {
+          console.warn("โหลด Hands ไม่สำเร็จ จะใช้โหมดแตะค้างแทน:", handErr);
+          handsReady = false;
+        }
+
         cameraInstance = new Camera(videoElement, {
-          onFrame: async () => { await poseInstance.send({ image: videoElement }); },
+          onFrame: async () => {
+            await poseInstance.send({ image: videoElement });
+            if (handsReady && handsInstance) {
+              try { await handsInstance.send({ image: videoElement }); } catch (e) {}
+            }
+          },
           width: activeVideoWidth,
           height: activeVideoHeight
         });
@@ -365,6 +395,38 @@
           statusBadge.className = "mt-4 px-4 py-2 rounded-full inline-flex items-center gap-2 font-bold text-sm bg-yellow-500/80 border border-yellow-400";
         }
       }
+    }
+
+    // ตรวจว่ากำมือหรือไม่ โดยดูว่าปลายนิ้วงอเข้าใกล้ข้อมือมากกว่าข้อกลางนิ้ว
+    function detectFist(lm) {
+      const wrist = lm[0];
+      const fingers = [[8, 6], [12, 10], [16, 14], [20, 18]]; // [ปลายนิ้ว, ข้อกลาง]
+      let curled = 0;
+      fingers.forEach(([tip, pip]) => {
+        const dTip = Math.hypot(lm[tip].x - wrist.x, lm[tip].y - wrist.y);
+        const dPip = Math.hypot(lm[pip].x - wrist.x, lm[pip].y - wrist.y);
+        if (dTip < dPip) curled++;
+      });
+      return curled >= 3; // งอ 3 นิ้วขึ้นไป = ถือว่ากำมือ
+    }
+
+    // รับผลจากโมเดล Hands แปลงเป็นพิกัดบนจอ + สถานะกำมือ
+    function onHandsResults(results) {
+      handCursors = [];
+      if (!results.multiHandLandmarks) return;
+      results.multiHandLandmarks.forEach((lm, i) => {
+        // ใช้จุดกลางฝ่ามือ (เฉลี่ยข้อมือกับโคนนิ้วกลาง) เป็นตำแหน่งเคอร์เซอร์
+        const palmX = (lm[0].x + lm[9].x) / 2;
+        const palmY = (lm[0].y + lm[9].y) / 2;
+        const sx = (1.0 - palmX) * gameCanvas.width;
+        const sy = palmY * gameCanvas.height;
+        let isLeft = true;
+        if (results.multiHandedness && results.multiHandedness[i]) {
+          // ภาพเป็นกระจกเงา จึงสลับ Left/Right ให้ตรงกับที่เด็กเห็น
+          isLeft = results.multiHandedness[i].label === 'Right';
+        }
+        handCursors.push({ x: sx, y: sy, isFist: detectFist(lm), isLeft });
+      });
     }
 
     function onPoseResults(results) {
@@ -537,6 +599,7 @@
 
       buildGameQuestions();
       spawnAnswerBoxes();
+      grabLatched = false;
 
       document.getElementById('scoreLabel').innerText = score;
       document.getElementById('questionIndexLabel').innerText = `1/${settings.questions}`;
@@ -607,8 +670,10 @@
     }
 
     // --- ตรวจสอบพิกัดการแตะ ---
-    const HIT_RADIUS = 60;   // ขยายพื้นที่รอบมือให้แตะโดนง่ายขึ้น (เดิม 35)
-    const HOLD_TIME = 0.3;   // เวลาแตะค้างเพื่อยืนยัน (เดิม 0.5) — โหลดเร็วขึ้น
+    const HIT_RADIUS = 60;    // (โหมดสำรอง) พื้นที่รอบมือตอนใช้แตะค้าง
+    const HOLD_TIME = 0.7;    // (โหมดสำรอง) เวลาแตะค้าง หากโหลด Hands ไม่ได้
+    const GRAB_RADIUS = 55;   // ระยะที่มือถือว่า "อยู่บนจรวด" พร้อมกำจับ
+    let grabLatched = false;  // กันการกำค้างแล้วเลือกรัวๆ — ต้องคลายมือก่อนถึงกำใหม่ได้
     let particleSystems = [];
 
     function spawnParticles(x, y, color) {
@@ -622,10 +687,48 @@
       }
     }
 
-    function checkBoxesCollision(handPoints, dt) {
+    function checkBoxesCollision(poseHands, dt) {
+      // โหมดกำมือ: ใช้เมื่อโหลด Hands สำเร็จและตรวจเจอมืออย่างน้อย 1 ข้าง
+      const useGrab = handsReady && handCursors.length > 0;
+
+      if (useGrab) {
+        const anyFist = handCursors.some(c => c.isFist);
+        answerBoxes.forEach(box => {
+          let hoverCursor = null;
+          handCursors.forEach(c => {
+            if (
+              c.x >= box.x - GRAB_RADIUS && c.x <= box.x + box.width + GRAB_RADIUS &&
+              c.y >= box.y - GRAB_RADIUS && c.y <= box.y + box.height + GRAB_RADIUS
+            ) { hoverCursor = c; }
+          });
+
+          if (hoverCursor) {
+            // มืออยู่บนจรวด → หยุดจรวดให้จับง่าย และแสดงสถานะเรืองแสง
+            box.isBeingTouched = true;
+            box.vx = 0; box.vy = 0;
+            // เลือกคำตอบเฉพาะตอน "เพิ่งกำมือ" (ยังไม่ latch) เพื่อไม่ให้มือผ่านเฉยๆ นับเป็นเลือก
+            if (hoverCursor.isFist && !grabLatched) {
+              grabLatched = true;
+              playAudio('tick');
+              processAnswer(box);
+            }
+          } else {
+            box.isBeingTouched = false;
+            if (Math.abs(box.vx) < 0.1 && Math.abs(box.vy) < 0.1) {
+              box.vx = box.originalVx;
+              box.vy = box.originalVy;
+            }
+          }
+        });
+        // ปล่อย latch เมื่อไม่มีมือกำอยู่เลย → พร้อมกำเลือกครั้งใหม่
+        if (!anyFist) grabLatched = false;
+        return;
+      }
+
+      // ===== โหมดสำรอง (แตะค้าง) หากไม่มี Hands =====
       answerBoxes.forEach(box => {
         let isTouchedThisFrame = false;
-        handPoints.forEach(point => {
+        poseHands.forEach(point => {
           if (
             point.x >= box.x - HIT_RADIUS &&
             point.x <= box.x + box.width + HIT_RADIUS &&
@@ -708,6 +811,7 @@
 
     function nextQuestion() {
       isTransitioningQuestion = false;
+      grabLatched = true; // เริ่มข้อใหม่แบบ latch ไว้ก่อน — ต้องคลายมือแล้วกำใหม่ กันเลือกต่อเนื่องจากข้อเดิม
       currentQuestionIndex++;
       const isGameOverByCount = currentQuestionIndex >= parseInt(settings.questions);
       if (isGameOverByCount) {
@@ -877,26 +981,63 @@
         gCtx.restore();
       });
 
-      detectedHands.forEach(hand => {
-        const isLeftHand = [15, 17, 19].includes(hand.id);
-        const glowColor = isLeftHand ? 'rgba(56, 189, 248, 0.8)' : 'rgba(244, 114, 182, 0.8)';
-        const innerColor = isLeftHand ? '#38bdf8' : '#f474b6';
-        gCtx.save();
-        gCtx.shadowBlur = 20;
-        gCtx.shadowColor = innerColor;
-        const pulsatingRadius = 25 + Math.sin(now / 80) * 4;
-        gCtx.fillStyle = glowColor;
-        gCtx.beginPath();
-        gCtx.arc(hand.x, hand.y, pulsatingRadius, 0, Math.PI * 2);
-        gCtx.fill();
-        gCtx.fillStyle = '#ffffff';
-        gCtx.beginPath();
-        gCtx.arc(hand.x, hand.y, 8, 0, Math.PI * 2);
-        gCtx.fill();
-        gCtx.font = '16px sans-serif';
-        gCtx.fillText(isLeftHand ? '🖐️ ซ้าย' : '🖐️ ขวา', hand.x - 20, hand.y - 35);
-        gCtx.restore();
-      });
+      // วาดเคอร์เซอร์มือ — โหมดกำมือแสดงสถานะเปิด/กำ, โหมดสำรองใช้จุดข้อมือ
+      const drawHandsMode = handsReady && handCursors.length > 0;
+      if (drawHandsMode) {
+        handCursors.forEach(hand => {
+          const glowColor = hand.isLeft ? 'rgba(56, 189, 248, 0.85)' : 'rgba(244, 114, 182, 0.85)';
+          const innerColor = hand.isLeft ? '#38bdf8' : '#f472b6';
+          gCtx.save();
+          gCtx.shadowBlur = 20;
+          gCtx.shadowColor = innerColor;
+          if (hand.isFist) {
+            // กำมือ = วงทึบเต็ม + ไอคอนกำปั้น
+            const r = 30 + Math.sin(now / 60) * 3;
+            gCtx.fillStyle = hand.isLeft ? '#0ea5e9' : '#ec4899';
+            gCtx.beginPath();
+            gCtx.arc(hand.x, hand.y, r, 0, Math.PI * 2);
+            gCtx.fill();
+            gCtx.shadowBlur = 0;
+            gCtx.font = '30px sans-serif';
+            gCtx.textAlign = 'center';
+            gCtx.textBaseline = 'middle';
+            gCtx.fillText('✊', hand.x, hand.y);
+          } else {
+            // เปิดมือ = วงแหวนโปร่ง + ไอคอนฝ่ามือ
+            const r = 28 + Math.sin(now / 80) * 4;
+            gCtx.strokeStyle = glowColor;
+            gCtx.lineWidth = 6;
+            gCtx.beginPath();
+            gCtx.arc(hand.x, hand.y, r, 0, Math.PI * 2);
+            gCtx.stroke();
+            gCtx.shadowBlur = 0;
+            gCtx.font = '26px sans-serif';
+            gCtx.textAlign = 'center';
+            gCtx.textBaseline = 'middle';
+            gCtx.fillText('🖐️', hand.x, hand.y);
+          }
+          gCtx.restore();
+        });
+      } else {
+        detectedHands.forEach(hand => {
+          const isLeftHand = [15, 17, 19].includes(hand.id);
+          const glowColor = isLeftHand ? 'rgba(56, 189, 248, 0.8)' : 'rgba(244, 114, 182, 0.8)';
+          const innerColor = isLeftHand ? '#38bdf8' : '#f474b6';
+          gCtx.save();
+          gCtx.shadowBlur = 20;
+          gCtx.shadowColor = innerColor;
+          const pulsatingRadius = 25 + Math.sin(now / 80) * 4;
+          gCtx.fillStyle = glowColor;
+          gCtx.beginPath();
+          gCtx.arc(hand.x, hand.y, pulsatingRadius, 0, Math.PI * 2);
+          gCtx.fill();
+          gCtx.fillStyle = '#ffffff';
+          gCtx.beginPath();
+          gCtx.arc(hand.x, hand.y, 8, 0, Math.PI * 2);
+          gCtx.fill();
+          gCtx.restore();
+        });
+      }
 
       requestAnimationFrame(mainGameLoop);
     }
