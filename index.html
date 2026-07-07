@@ -1,1441 +1,625 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>วิ่งแตะคำตอบ - เกมคณิตศาสตร์ AI ป.1</title>
-  
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Google Fonts: Mitr & Fredoka for Kid-Friendly UI -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Mitr:wght@300;400;500;700&display=swap" rel="stylesheet">
-  
-  <!-- FontAwesome for cute icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>วิ่งแตะคำตอบ | เกมบวกเลข ป.1</title>
+<style>
+  :root{
+    --bg1:#2b1a55; --bg2:#4b2a8a;
+    --sun:#ffd23f; --sky:#38bdf8; --grass:#34d399;
+    --pink:#ff6bcb; --orange:#ff8b3d; --red:#ef4444; --green:#22c55e;
+    --ink:#1b1035; --paper:#fffdf5;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;font-family:'Baloo 2','Comic Sans MS','Sarabun',system-ui,sans-serif;
+    background:radial-gradient(circle at 30% 20%,var(--bg2),var(--bg1));color:var(--paper);overflow:hidden;}
+  button{font-family:inherit;cursor:pointer;border:none;}
 
-  <!-- MediaPipe Pose and Camera Utils CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+  /* ---------- SCREENS ---------- */
+  .screen{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+    padding:24px;text-align:center;overflow-y:auto;}
+  .screen.active{display:flex;}
 
-  <style>
-    body {
-      font-family: 'Mitr', 'Fredoka', sans-serif;
-      background: linear-gradient(135deg, #FFDEE9 0%, #B5FFFC 100%);
-      overflow-x: hidden;
-    }
-    .bubble-btn {
-      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-    .bubble-btn:hover {
-      transform: scale(1.08) translateY(-3px);
-    }
-    .bubble-btn:active {
-      transform: scale(0.95) translateY(1px);
-    }
-    /* Custom Scrollbar for Leaderboard */
-    ::-webkit-scrollbar {
-      width: 8px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #f1f1f1;
-      border-radius: 10px;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #ff7675;
-      border-radius: 10px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #e17055;
-    }
-    /* Flashing Screen Effects */
-    @keyframes flashGreen {
-      0%, 100% { background-color: rgba(255, 255, 255, 0); }
-      50% { background-color: rgba(74, 222, 128, 0.3); }
-    }
-    @keyframes flashRed {
-      0%, 100% { background-color: rgba(255, 255, 255, 0); }
-      50% { background-color: rgba(248, 113, 113, 0.3); }
-    }
-    .flash-success {
-      animation: flashGreen 0.6s ease-out;
-    }
-    .flash-error {
-      animation: flashRed 0.6s ease-out;
-    }
-  </style>
+  h1{font-size:clamp(34px,7vw,64px);margin:0 0 6px;color:var(--sun);
+    text-shadow:0 4px 0 #b06d00,0 8px 24px rgba(0,0,0,.4);letter-spacing:1px;}
+  .subtitle{font-size:clamp(16px,3vw,22px);opacity:.9;margin-bottom:26px;}
+  .capy{font-size:clamp(56px,12vw,110px);line-height:1;filter:drop-shadow(0 8px 14px rgba(0,0,0,.35));
+    animation:bob 2.4s ease-in-out infinite;}
+  @keyframes bob{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-14px) rotate(3deg)}}
+
+  .big-btn{font-size:clamp(22px,4.5vw,30px);font-weight:800;color:var(--ink);
+    background:linear-gradient(180deg,#ffe37a,var(--sun));padding:18px 42px;border-radius:999px;
+    box-shadow:0 6px 0 #b06d00,0 12px 26px rgba(0,0,0,.35);transition:transform .08s,box-shadow .08s;margin:8px;}
+  .big-btn:active{transform:translateY(4px);box-shadow:0 2px 0 #b06d00,0 6px 14px rgba(0,0,0,.35);}
+  .ghost-btn{background:rgba(255,255,255,.14);color:#fff;box-shadow:none;border:2px solid rgba(255,255,255,.35);
+    padding:14px 30px;font-size:clamp(16px,3vw,20px);font-weight:700;border-radius:999px;margin:6px;}
+
+  /* ---------- TEACHER SETTINGS ---------- */
+  .card{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:26px;
+    padding:22px;max-width:560px;width:100%;backdrop-filter:blur(6px);margin-bottom:14px;}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:14px 0;flex-wrap:wrap;}
+  .row>span{font-size:clamp(15px,2.8vw,19px);font-weight:700;text-align:left;}
+  .opts{display:flex;gap:8px;flex-wrap:wrap;}
+  .chip{background:rgba(255,255,255,.12);border:2px solid transparent;color:#fff;border-radius:14px;
+    padding:9px 16px;font-size:15px;font-weight:700;}
+  .chip.on{background:var(--sun);color:var(--ink);border-color:#fff;}
+  .name-input{width:100%;max-width:360px;font-size:22px;font-weight:800;text-align:center;padding:14px;
+    border-radius:16px;border:3px solid var(--sun);background:var(--paper);color:var(--ink);margin:4px 0 8px;}
+
+  /* ---------- INSTRUCTIONS ---------- */
+  .instr{max-width:520px;background:rgba(255,255,255,.08);border-radius:26px;padding:26px;line-height:1.6;}
+  .instr li{font-size:clamp(16px,3vw,20px);margin:10px 0;text-align:left;}
+  .measure{font-size:clamp(20px,4vw,28px);font-weight:800;color:var(--sun);margin:12px 0;}
+
+  /* ---------- GAME ---------- */
+  #gameScreen{padding:0;}
+  #wrap{position:relative;width:100%;height:100%;overflow:hidden;background:#000;}
+  #video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);}
+  #overlay{position:absolute;inset:0;width:100%;height:100%;}
+
+  .hud{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;
+    padding:14px 18px;pointer-events:none;z-index:5;}
+  .hud .pill{background:rgba(20,10,45,.66);border:2px solid rgba(255,255,255,.25);border-radius:16px;
+    padding:8px 16px;font-size:clamp(16px,3.4vw,24px);font-weight:800;backdrop-filter:blur(4px);}
+  #timerPill.low{background:rgba(180,20,20,.8);animation:pulse .8s infinite;}
+  @keyframes pulse{50%{transform:scale(1.08)}}
+
+  #questionBar{position:absolute;top:64px;left:50%;transform:translateX(-50%);z-index:5;pointer-events:none;
+    background:rgba(20,10,45,.72);border:3px solid var(--sun);border-radius:22px;
+    padding:12px 34px;font-size:clamp(34px,8vw,64px);font-weight:900;color:#fff;text-shadow:0 3px 8px rgba(0,0,0,.5);}
+
+  #banner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.5);z-index:8;
+    font-size:clamp(40px,10vw,90px);font-weight:900;opacity:0;pointer-events:none;text-shadow:0 6px 18px rgba(0,0,0,.6);}
+  #banner.show{animation:pop 1.1s ease forwards;}
+  @keyframes pop{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}
+    20%{opacity:1;transform:translate(-50%,-50%) scale(1.15)}
+    70%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(1)}}
+
+  #warn{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);z-index:6;
+    background:rgba(180,40,40,.85);padding:10px 22px;border-radius:16px;font-weight:800;font-size:18px;display:none;}
+  #bonusFlag{position:absolute;top:64px;right:14px;z-index:6;background:linear-gradient(180deg,#ff8b3d,#ff3d9a);
+    padding:8px 16px;border-radius:14px;font-weight:900;display:none;box-shadow:0 0 22px #ff3d9a;}
+
+  #quitBtn{position:absolute;bottom:16px;right:16px;z-index:6;background:rgba(20,10,45,.7);
+    border:2px solid rgba(255,255,255,.3);color:#fff;padding:10px 18px;border-radius:14px;font-weight:700;}
+
+  /* ---------- SUMMARY ---------- */
+  .stat{font-size:clamp(20px,4vw,28px);margin:8px 0;font-weight:800;}
+  .stat b{color:var(--sun);}
+  .board{max-width:460px;width:100%;text-align:left;}
+  .board table{width:100%;border-collapse:collapse;font-size:16px;}
+  .board td{padding:7px 8px;border-bottom:1px solid rgba(255,255,255,.12);}
+  .board tr.me td{color:var(--sun);font-weight:900;}
+  .board .rk{width:34px;font-weight:900;}
+
+  /* loading */
+  #loader{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;background:rgba(20,10,45,.92);font-size:22px;font-weight:800;gap:16px;}
+  .spin{width:56px;height:56px;border:6px solid rgba(255,255,255,.25);border-top-color:var(--sun);
+    border-radius:50%;animation:sp 1s linear infinite;}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
 </head>
-<body class="min-h-screen flex flex-col items-center justify-center p-2 sm:p-4">
+<body>
 
-  <!-- ==================== MAIN CONTAINER ==================== -->
-  <div class="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-3xl shadow-2xl border-4 border-yellow-300 p-4 md:p-6 relative overflow-hidden flex flex-col min-h-[600px]">
-    
-    <!-- Decorative background elements -->
-    <div class="absolute -top-10 -left-10 w-24 h-24 bg-yellow-200 rounded-full blur-xl opacity-60"></div>
-    <div class="absolute -bottom-10 -right-10 w-36 h-36 bg-pink-200 rounded-full blur-xl opacity-60"></div>
+<!-- ===== HOME ===== -->
+<div id="homeScreen" class="screen active">
+  <div class="capy">🦫</div>
+  <h1>วิ่งแตะคำตอบ</h1>
+  <div class="subtitle">เกมบวกเลข ป.1 · ใช้มือแตะคำตอบด้วยกล้อง 📷</div>
+  <button class="big-btn" onclick="goSettings()">▶️ เริ่มเล่น</button>
+  <button class="ghost-btn" onclick="show('howScreen')">🏆 ตารางคะแนน & วิธีเล่น</button>
+</div>
 
-    <!-- ==================== SCREEN 1: TEACHER CONFIG & MAIN MENU ==================== -->
-    <div id="screen-menu" class="flex flex-col items-center justify-between flex-grow">
-      
-      <!-- Logo Header -->
-      <div class="text-center my-4 animate-bounce">
-        <h1 class="text-4xl md:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 drop-shadow-md">
-          🏃‍♂️ วิ่งแตะคำตอบ! 🏃‍♀️
-        </h1>
-        <p class="text-sm md:text-lg text-gray-600 mt-2 font-medium">
-          เกมคณิตศาสตร์บวกเลข ป.1 ตรวจจับความเคลื่อนไหวด้วย AI แสนสนุก
-        </p>
-      </div>
-
-      <!-- Settings & Leaderboard Tabs Container -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full max-w-4xl my-2">
-        
-        <!-- Teacher Settings Panel -->
-        <div class="bg-gradient-to-br from-yellow-50 to-orange-100 rounded-2xl border-2 border-yellow-300 p-5 shadow-inner">
-          <h2 class="text-xl md:text-2xl font-bold text-orange-600 mb-4 flex items-center gap-2 justify-center lg:justify-start">
-            <i class="fa-solid fa-chalkboard-user"></i> โหมดตั้งค่าสไตล์คุณครู (Teacher Setup)
-          </h2>
-          
-          <div class="space-y-4 text-gray-700 text-sm md:text-base">
-            <!-- Math Level -->
-            <div>
-              <label class="block font-bold text-gray-700 mb-1">🎯 ช่วงผลลัพธ์คำตอบ:</label>
-              <div class="grid grid-cols-3 gap-2">
-                <button onclick="setConfig('level', '10')" id="btn-level-10" class="config-btn py-2 px-1 bg-orange-500 text-white font-semibold rounded-xl text-center shadow-md text-xs sm:text-sm">ไม่เกิน 10</button>
-                <button onclick="setConfig('level', '20')" id="btn-level-20" class="config-btn py-2 px-1 bg-white text-gray-700 border border-gray-300 font-semibold rounded-xl text-center shadow-sm text-xs sm:text-sm">ไม่เกิน 20</button>
-                <button onclick="setConfig('level', 'carry')" id="btn-level-carry" class="config-btn py-2 px-1 bg-white text-gray-700 border border-gray-300 font-semibold rounded-xl text-center shadow-sm text-xs sm:text-sm">แบบมีทด</button>
-              </div>
-            </div>
-
-            <!-- Total Questions -->
-            <div>
-              <label class="block font-bold text-gray-700 mb-1 flex justify-between">
-                <span>📝 จำนวนโจทย์คำถาม:</span>
-                <span id="label-q-count" class="text-orange-600 font-bold">10 ข้อ</span>
-              </label>
-              <input type="range" id="input-q-count" min="5" max="15" value="10" step="1" 
-                     class="w-full h-2 bg-yellow-200 rounded-lg appearance-none cursor-pointer accent-orange-500"
-                     oninput="updateConfigLabel('q-count', this.value)">
-            </div>
-
-            <!-- Box Options Count -->
-            <div>
-              <label class="block font-bold text-gray-700 mb-1">📦 จำนวนกล่องตัวเลือก:</label>
-              <div class="grid grid-cols-3 gap-2">
-                <button onclick="setConfig('options', 2)" id="btn-opt-2" class="config-btn py-2 px-1 bg-white text-gray-700 border border-gray-300 font-semibold rounded-xl text-center text-xs sm:text-sm shadow-sm">2 ตัวเลือก</button>
-                <button onclick="setConfig('options', 3)" id="btn-opt-3" class="config-btn py-2 px-1 bg-orange-500 text-white font-semibold rounded-xl text-center text-xs sm:text-sm shadow-md">3 ตัวเลือก</button>
-                <button onclick="setConfig('options', 4)" id="btn-opt-4" class="config-btn py-2 px-1 bg-white text-gray-700 border border-gray-300 font-semibold rounded-xl text-center text-xs sm:text-sm shadow-sm">4 ตัวเลือก</button>
-              </div>
-            </div>
-
-            <!-- Time Limit -->
-            <div>
-              <label class="block font-bold text-gray-700 mb-1 flex justify-between">
-                <span>⏱️ เวลาเล่นเกมทั้งหมด:</span>
-                <span id="label-time" class="text-orange-600 font-bold">90 วินาที</span>
-              </label>
-              <input type="range" id="input-time" min="30" max="120" value="90" step="15" 
-                     class="w-full h-2 bg-yellow-200 rounded-lg appearance-none cursor-pointer accent-orange-500"
-                     oninput="updateConfigLabel('time', this.value)">
-            </div>
-          </div>
-        </div>
-
-        <!-- Leaderboard Panel -->
-        <div class="bg-gradient-to-br from-pink-50 to-indigo-100 rounded-2xl border-2 border-indigo-300 p-5 shadow-inner flex flex-col">
-          <h2 class="text-xl md:text-2xl font-bold text-indigo-600 mb-3 flex items-center gap-2 justify-center lg:justify-start">
-            <i class="fa-solid fa-trophy text-yellow-500 animate-pulse"></i> ทำเนียบผู้กล้า (Top 10)
-          </h2>
-          <!-- Score Table -->
-          <div class="flex-grow overflow-y-auto max-h-[220px] pr-2" id="leaderboard-container">
-            <!-- Dynamic Content -->
-            <table class="w-full text-left text-xs md:text-sm">
-              <thead>
-                <tr class="border-b border-indigo-200 text-indigo-700">
-                  <th class="py-1">อันดับ</th>
-                  <th class="py-1">ชื่อฮีโร่</th>
-                  <th class="py-1 text-center">คะแนน</th>
-                  <th class="py-1 text-right">เวลาเฉลี่ย/ข้อ</th>
-                </tr>
-              </thead>
-              <tbody id="leaderboard-rows" class="text-gray-700">
-                <!-- Generated by JS -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Controller Mode Select & Big Action Buttons -->
-      <div class="w-full max-w-md flex flex-col gap-3 my-4 items-center">
-        <!-- Play Mode Controller Selector -->
-        <div class="bg-white p-2 rounded-2xl shadow-md border border-gray-200 flex items-center justify-around w-full">
-          <span class="text-xs sm:text-sm font-bold text-gray-500"><i class="fa-solid fa-gamepad"></i> โหมดควบคุม:</span>
-          <label class="inline-flex items-center cursor-pointer">
-            <input type="checkbox" id="control-mode-toggle" class="sr-only peer" onchange="toggleControlMode()">
-            <div class="relative w-28 h-7 bg-indigo-500 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-[50px] after:transition-all peer-checked:bg-green-500">
-              <span class="absolute text-[10px] text-white font-extrabold left-3 top-1.5 pointer-events-none">กล้อง AI</span>
-              <span class="absolute text-[10px] text-white font-extrabold right-3 top-1.5 pointer-events-none">เมาส์/สัมผัส</span>
-            </div>
-          </label>
-        </div>
-
-        <!-- Name Input -->
-        <div class="w-full relative">
-          <span class="absolute left-4 top-1/2 -translate-y-1/2 text-pink-500"><i class="fa-solid fa-user-ninja"></i></span>
-          <input type="text" id="player-name-input" placeholder="พิมพ์ชื่อผู้เล่นที่นี่นะเด็กๆ..." 
-                 class="w-full pl-10 pr-4 py-3 rounded-2xl border-2 border-pink-400 focus:border-pink-600 focus:outline-none text-center font-bold text-gray-700 shadow-md">
-        </div>
-
-        <button onclick="startGame()" class="bubble-btn w-full bg-gradient-to-r from-green-400 to-emerald-500 text-white font-extrabold text-2xl py-4 rounded-2xl shadow-lg border-b-4 border-emerald-700 flex items-center justify-center gap-3">
-          <i class="fa-solid fa-play"></i> เริ่มเล่นวิ่งแตะคำตอบ!
-        </button>
-      </div>
-
-    </div>
-
-    <!-- ==================== SCREEN 2: LOADING & CALIBRATION ==================== -->
-    <div id="screen-loading" class="hidden flex-col items-center justify-center flex-grow py-8 text-center">
-      <div class="relative w-40 h-40 flex items-center justify-center">
-        <!-- Pulsing ring -->
-        <div class="absolute inset-0 rounded-full border-4 border-dashed border-pink-400 animate-spin"></div>
-        <i class="fa-solid fa-robot text-6xl text-pink-500 animate-bounce"></i>
-      </div>
-      <h2 class="text-3xl font-extrabold text-indigo-700 mt-6" id="loading-title">ระบบกำลังปลุกหุ่นยนต์ AI...</h2>
-      <p class="text-gray-500 mt-2 max-w-md text-sm md:text-base px-4" id="loading-subtext">
-        โปรดอนุญาตสิทธิ์เข้าใช้งานกล้องหน้าของคุณครู/นักเรียน เพื่อให้ AI ตรวจจับท่าทางของคุณนะคร้าบ 🤖
-      </p>
-      
-      <!-- Calibration instructions -->
-      <div class="mt-6 bg-blue-50 border-2 border-blue-200 rounded-2xl p-4 max-w-lg hidden" id="calibration-area">
-        <h3 class="font-bold text-blue-700 text-lg mb-2"><i class="fa-solid fa-person-circle-check"></i> ขั้นตอนการเตรียมตัววิ่ง</h3>
-        <ul class="text-left text-sm text-gray-600 space-y-2 list-disc pl-5">
-          <li>จัดกล้องให้อยู่ในแนวราบสูงประมาณระดับหน้าอก</li>
-          <li>ถอยห่างออกมาให้กล้องเห็นตัวนักเรียน (อย่างน้อยครึ่งตัวบนขึ้นไป)</li>
-          <li>เมื่อกล้องพร้อมแล้ว กดปุ่มวิ่งเพื่อเริ่มเก็บคะแนนกันเลย!</li>
-        </ul>
-        <button onclick="startActionPhase()" class="bubble-btn mt-4 px-8 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-extrabold text-lg rounded-2xl shadow-lg">
-          <i class="fa-solid fa-person-running"></i> เข้าสู่เกมวิ่ง!
-        </button>
-      </div>
-
-      <!-- Hidden Video Element for MediaPipe Input -->
-      <div class="opacity-0 absolute -z-10 w-1 h-1 pointer-events-none">
-        <video id="webcam" playsinline muted></video>
+<!-- ===== TEACHER SETTINGS ===== -->
+<div id="settingScreen" class="screen">
+  <h1 style="font-size:clamp(28px,5vw,44px)">👩‍🏫 โหมดครู</h1>
+  <div class="card">
+    <input id="playerName" class="name-input" placeholder="ใส่ชื่อผู้เล่น" maxlength="14">
+    <div class="row"><span>ช่วงผลลัพธ์</span>
+      <div class="opts" data-key="range">
+        <button class="chip" data-v="10">ไม่เกิน 10</button>
+        <button class="chip on" data-v="20">ไม่เกิน 20</button>
+        <button class="chip" data-v="carry">มีทด</button>
       </div>
     </div>
-
-    <!-- ==================== SCREEN 3: GAMEPLAY ARENA ==================== -->
-    <div id="screen-gameplay" class="hidden flex-col flex-grow relative">
-      
-      <!-- Stats Dashboard -->
-      <div class="flex items-center justify-between bg-white/80 p-2 rounded-2xl border-2 border-indigo-200 mb-2 shadow-sm z-20 relative">
-        <div class="flex items-center gap-2">
-          <span class="bg-yellow-100 border border-yellow-300 text-yellow-700 px-3 py-1.5 rounded-xl font-bold text-sm md:text-base shadow-sm">
-            👑 <span id="display-player-name">เด็กดี</span>
-          </span>
-          <span class="bg-indigo-100 border border-indigo-300 text-indigo-700 px-3 py-1.5 rounded-xl font-bold text-sm md:text-base shadow-sm">
-            🏆 <span id="display-score">0</span> คะแนน
-          </span>
-        </div>
-        <!-- Center Bonus Round Signal -->
-        <div id="bonus-banner" class="hidden bg-gradient-to-r from-yellow-400 to-red-500 text-white font-black text-xs md:text-sm px-4 py-1.5 rounded-xl border border-yellow-300 animate-pulse">
-          ⚡ BONUS ROUND x5! ⚡
-        </div>
-        <div class="flex items-center gap-2">
-          <span id="display-timer" class="bg-red-100 border border-red-300 text-red-600 px-3 py-1.5 rounded-xl font-bold text-sm md:text-base shadow-sm flex items-center gap-1">
-            <i class="fa-solid fa-hourglass-half animate-spin"></i> <span>90s</span>
-          </span>
-          <span class="bg-teal-100 border border-teal-300 text-teal-700 px-3 py-1.5 rounded-xl font-bold text-sm md:text-base shadow-sm">
-            📝 <span id="display-q-index">1/10</span>
-          </span>
-        </div>
-      </div>
-
-      <!-- Main Game Canvas Container -->
-      <div class="relative w-full flex-grow rounded-2xl overflow-hidden border-4 border-indigo-500 shadow-xl bg-black min-h-[350px] md:min-h-[480px] flex items-center justify-center">
-        <!-- Canvas Layer for AI tracking & math elements -->
-        <canvas id="game-canvas" class="absolute inset-0 w-full h-full object-cover"></canvas>
-        
-        <!-- Big math question bubble overlaid natively on canvas (or HTML overlay over canvas) -->
-        <div class="absolute top-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm border-4 border-pink-400 px-6 py-3 rounded-2xl shadow-xl text-center z-10 transition-transform duration-300 scale-100" id="math-question-bubble">
-          <span class="text-xs font-bold text-pink-500 block uppercase tracking-wider" id="question-sub-title">หาคำตอบที่ถูกต้องกันเถอะเด็กๆ!</span>
-          <span class="text-3xl md:text-5xl font-extrabold text-indigo-800" id="math-equation-text">8 + 7 = ?</span>
-        </div>
-
-        <!-- Big Center Feedbacks like "เก่งมาก!" or "ลองใหม่นะ" -->
-        <div id="feedback-overlay" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-20 opacity-0 transition-opacity duration-300">
-          <div id="feedback-card" class="bg-white/95 border-8 p-6 md:p-10 rounded-3xl shadow-2xl flex flex-col items-center max-w-sm text-center transform scale-75 transition-transform duration-300">
-            <div id="feedback-icon" class="text-6xl mb-4">🎉</div>
-            <h2 id="feedback-title" class="text-3xl md:text-4xl font-black mb-2 text-green-600">เก่งมากๆ!</h2>
-            <p id="feedback-desc" class="text-gray-600 font-bold text-sm md:text-base">คุณแตะคำตอบที่ถูกต้อง</p>
-          </div>
-        </div>
-
-        <!-- Manual Play Indicator -->
-        <div id="manual-mode-indicator" class="hidden absolute bottom-3 left-3 bg-green-500 text-white text-xs px-3 py-1.5 rounded-full font-bold shadow-md z-10 animate-pulse">
-          💡 สัมผัสหรือคลิกที่ป้ายคำตอบได้เลย
-        </div>
-      </div>
-
-    </div>
-
-    <!-- ==================== SCREEN 4: GAME OVER & SUMMARY ==================== -->
-    <div id="screen-gameover" class="hidden flex-col items-center justify-center flex-grow py-4 text-center">
-      <div class="animate-bounce mb-4 text-7xl">🏆</div>
-      <h2 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-500 to-orange-500">ภารกิจสำเร็จแล้ว!</h2>
-      <p class="text-gray-500 mt-1 font-bold text-sm md:text-lg">เด็กๆ วิ่งเก่งและคิดเลขไวมากเลยครับ</p>
-
-      <!-- Stats Summary Cards -->
-      <div class="grid grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-2xl my-6">
-        <div class="bg-yellow-50 border-2 border-yellow-300 rounded-2xl p-4 shadow-sm flex flex-col items-center">
-          <span class="text-2xl">⭐</span>
-          <span class="text-gray-500 text-xs font-bold mt-1">คะแนนรวมทั้งหมด</span>
-          <span class="text-3xl font-black text-orange-500" id="summary-score">0</span>
-        </div>
-        <div class="bg-green-50 border-2 border-green-300 rounded-2xl p-4 shadow-sm flex flex-col items-center">
-          <span class="text-2xl">✅</span>
-          <span class="text-gray-500 text-xs font-bold mt-1">ตอบถูกทั้งหมด</span>
-          <span class="text-3xl font-black text-green-500" id="summary-correct">0/10 ข้อ</span>
-        </div>
-        <div class="bg-blue-50 border-2 border-blue-300 rounded-2xl p-4 shadow-sm flex flex-col items-center col-span-2 md:col-span-1">
-          <span class="text-2xl">⚡</span>
-          <span class="text-gray-500 text-xs font-bold mt-1">เวลาเฉลี่ยต่อข้อ</span>
-          <span class="text-3xl font-black text-blue-500" id="summary-avg-time">0.0 วินาที</span>
-        </div>
-      </div>
-
-      <!-- Play Again & Main Menu Actions -->
-      <div class="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-        <button onclick="resetGameToSetup()" class="bubble-btn flex-1 py-4 px-6 bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-extrabold text-xl rounded-2xl shadow-lg border-b-4 border-indigo-800 flex items-center justify-center gap-2">
-          <i class="fa-solid fa-home"></i> กลับหน้าแรก
-        </button>
-        <button onclick="restartGamePlay()" class="bubble-btn flex-1 py-4 px-6 bg-gradient-to-r from-green-400 to-emerald-500 text-white font-extrabold text-xl rounded-2xl shadow-lg border-b-4 border-emerald-800 flex items-center justify-center gap-2">
-          <i class="fa-solid fa-rotate-right"></i> เล่นอีกครั้ง!
-        </button>
+    <div class="row"><span>จำนวนข้อ</span>
+      <div class="opts" data-key="count">
+        <button class="chip" data-v="5">5</button>
+        <button class="chip on" data-v="10">10</button>
+        <button class="chip" data-v="15">15</button>
       </div>
     </div>
-
+    <div class="row"><span>จำนวนกล่องตัวเลือก</span>
+      <div class="opts" data-key="choices">
+        <button class="chip" data-v="2">2</button>
+        <button class="chip" data-v="3">3</button>
+        <button class="chip on" data-v="4">4</button>
+      </div>
+    </div>
+    <div class="row"><span>ความเร็วกล่อง</span>
+      <div class="opts" data-key="speed">
+        <button class="chip on" data-v="slow">ช้า</button>
+        <button class="chip" data-v="mid">กลาง</button>
+        <button class="chip" data-v="fast">เร็ว</button>
+      </div>
+    </div>
+    <div class="row"><span>เวลาแข่งขัน</span>
+      <div class="opts" data-key="time">
+        <button class="chip" data-v="60">1 นาที</button>
+        <button class="chip on" data-v="120">2 นาที</button>
+        <button class="chip" data-v="180">3 นาที</button>
+        <button class="chip" data-v="0">ไม่จับเวลา</button>
+      </div>
+    </div>
   </div>
+  <div>
+    <button class="ghost-btn" onclick="show('homeScreen')">◀️ กลับ</button>
+    <button class="big-btn" onclick="show('instrScreen')">ถัดไป ▶️</button>
+  </div>
+</div>
 
-  <!-- ==================== SCRIPT LOGIC ==================== -->
-  <script>
-    // System Constants & Global variables
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'running-math-p1';
-    
-    // Configurations
-    let config = {
-      level: '10', // '10', '20', 'carry'
-      qCount: 10,
-      optionsCount: 3,
-      totalTime: 90
+<!-- ===== INSTRUCTIONS ===== -->
+<div id="instrScreen" class="screen">
+  <div class="capy" style="font-size:70px">🦫</div>
+  <h1 style="font-size:clamp(26px,5vw,40px)">เตรียมตัวก่อนเล่น</h1>
+  <div class="instr">
+    <div class="measure">📏 ถอยห่างจากกล้องประมาณ 2 เมตร</div>
+    <ul>
+      <li>🧍 ยืนให้กล้องเห็นตั้งแต่ <b>หัวถึงเอว</b></li>
+      <li>💡 อยู่ในที่ <b>แสงสว่างพอ</b> ไม่ย้อนแสง</li>
+      <li>🖐️ จะมี <b>วงกลมเรืองแสง</b> อยู่ที่มือทั้งสองข้าง</li>
+      <li>🏃 ยื่นมือไปแตะกล่องคำตอบที่ถูก <b>ค้างไว้แป๊บนึง</b></li>
+    </ul>
+  </div>
+  <div>
+    <button class="ghost-btn" onclick="show('settingScreen')">◀️ ตั้งค่า</button>
+    <button class="big-btn" onclick="startGame()">📷 เปิดกล้อง & เริ่ม!</button>
+  </div>
+</div>
+
+<!-- ===== GAME ===== -->
+<div id="gameScreen" class="screen">
+  <div id="wrap">
+    <video id="video" playsinline muted></video>
+    <canvas id="overlay"></canvas>
+    <div class="hud">
+      <div class="pill" id="scorePill">⭐ 0</div>
+      <div class="pill" id="qPill">0/0</div>
+    </div>
+    <div class="pill" id="timerPill" style="position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:5">⏱️ --</div>
+    <div id="questionBar">— + — = ?</div>
+    <div id="bonusFlag">⭐ BONUS! ⭐</div>
+    <div id="banner"></div>
+    <div id="warn">👀 ถอยออกให้กล้องเห็นตัวหน่อยนะ</div>
+    <button id="quitBtn" onclick="endGame(true)">⏹️ จบเกม</button>
+    <div id="loader"><div class="spin"></div><div id="loadTxt">กำลังโหลด AI ตรวจจับร่างกาย…</div></div>
+  </div>
+</div>
+
+<!-- ===== SUMMARY ===== -->
+<div id="summaryScreen" class="screen">
+  <div class="capy" style="font-size:80px">🏆</div>
+  <h1 style="font-size:clamp(30px,6vw,50px)">จบเกมแล้ว!</h1>
+  <div class="stat">🏆 คะแนนรวม <b id="sScore">0</b></div>
+  <div class="stat">✅ ตอบถูก <b id="sCorrect">0</b> ข้อ</div>
+  <div class="stat">⚡ เฉลี่ย <b id="sAvg">0</b> วิ/ข้อ</div>
+  <div class="board card" style="margin-top:16px">
+    <div style="font-weight:900;font-size:20px;margin-bottom:6px">🏅 Top 10</div>
+    <table id="boardTable"></table>
+  </div>
+  <div>
+    <button class="big-btn" onclick="show('instrScreen')">🔁 เล่นอีกครั้ง</button>
+    <button class="ghost-btn" onclick="show('homeScreen')">🏠 หน้าแรก</button>
+  </div>
+</div>
+
+<!-- ===== HOW / BOARD ===== -->
+<div id="howScreen" class="screen">
+  <h1 style="font-size:clamp(28px,5vw,44px)">วิธีเล่น</h1>
+  <div class="instr" style="max-width:520px">
+    <ul>
+      <li>1️⃣ กดเริ่มเล่น แล้วตั้งค่าในโหมดครู</li>
+      <li>2️⃣ ถอยห่างจอ ~2 เมตร ให้กล้องเห็นตัว</li>
+      <li>3️⃣ ยื่นมือไปแตะ <b>กล่องคำตอบที่ถูก</b> ค้าง 0.5 วิ</li>
+      <li>✅ ถูก +10 · ❌ ผิด -5 · ⭐ โบนัสทุก 30 วิ +50</li>
+    </ul>
+  </div>
+  <div class="board card"><div style="font-weight:900;margin-bottom:6px">🏅 Top 10</div><table id="boardTable2"></table></div>
+  <button class="big-btn" onclick="show('homeScreen')">🏠 กลับหน้าแรก</button>
+</div>
+
+<!-- ===== Libraries (CDN) ===== -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js" crossorigin="anonymous"></script>
+
+<script>
+/* ============ SETTINGS ============ */
+const CFG = { range:'20', count:10, choices:4, speed:'slow', time:120 };
+const SPEED_MAP = { slow:0.10, mid:0.20, fast:0.34 };
+
+document.querySelectorAll('.opts').forEach(group=>{
+  group.addEventListener('click',e=>{
+    const b=e.target.closest('.chip'); if(!b) return;
+    group.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
+    b.classList.add('on');
+    const key=group.dataset.key, v=b.dataset.v;
+    CFG[key] = (key==='count'||key==='choices'||key==='time') ? parseInt(v) : v;
+  });
+});
+
+/* ============ SCREEN NAV ============ */
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(id==='homeScreen'||id==='settingScreen') stopEverything();
+  if(id==='howScreen') renderBoard('boardTable2');
+}
+function goSettings(){ show('settingScreen'); }
+
+/* ============ GAME STATE ============ */
+let video,overlay,ctx,pose,cam;
+let running=false, score=0, qIndex=0, correctCount=0;
+let boxes=[], answer=0, questionText='';
+let hands=[]; // {x,y} in canvas px
+let holdTarget=null, holdStart=0;
+let bonusActive=false, bonusDeadline=0, lastBonus=0, nextBonusAt=30;
+let gameStart=0, timeLeft=0, timerId=null, noBodyFrames=0;
+let W=0,H=0, transitioning=false;
+
+/* ============ PROBLEM GEN ============ */
+function genProblem(){
+  let a,b,sum;
+  if(CFG.range==='10'){ do{a=rand(0,9);b=rand(0,9);sum=a+b;}while(sum>10); }
+  else if(CFG.range==='carry'){ do{a=rand(3,9);b=rand(3,9);sum=a+b;}while((a%10)+(b%10)<10||sum>20); }
+  else { do{a=rand(0,15);b=rand(0,15);sum=a+b;}while(sum>20); }
+  answer=sum; questionText=`${a} + ${b} = ?`;
+  document.getElementById('questionBar').textContent=questionText;
+
+  // build choices
+  const set=new Set([sum]);
+  while(set.size<CFG.choices){
+    let d=sum+rand(-4,4); if(d<0)d=Math.abs(d);
+    if(d!==sum) set.add(d);
+  }
+  const vals=shuffle([...set]);
+  const bw=Math.min(W*0.26,150), bh=bw*0.78;
+  const sp=SPEED_MAP[CFG.speed]*Math.min(W,H)/100;
+  const colors=['#ff6bcb','#38bdf8','#34d399','#ff8b3d'];
+  boxes=vals.map((v,i)=>{
+    return {
+      val:v, correct:v===sum,
+      x:rand(bw, W-bw*2), y:rand(H*0.32, H-bh*1.5),
+      vx:(Math.random()<.5?-1:1)*sp*(0.7+Math.random()*0.6),
+      vy:(Math.random()<.5?-1:1)*sp*(0.7+Math.random()*0.6),
+      w:bw,h:bh, color:colors[i%colors.length],
+      state:'idle', flash:0
     };
+  });
+  holdTarget=null;
+}
+const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const shuffle=a=>a.sort(()=>Math.random()-.5);
 
-    // State Manager
-    let currentScreen = 'screen-menu';
-    let playerName = "เด็กดี";
-    let isManualMode = false; // true = Mouse simulation, false = AI Camera tracking
-    let isWebcamActive = false;
+/* ============ START ============ */
+async function startGame(){
+  show('gameScreen');
+  video=document.getElementById('video');
+  overlay=document.getElementById('overlay');
+  ctx=overlay.getContext('2d');
+  document.getElementById('loader').style.display='flex';
+  resize();
+  window.addEventListener('resize',resize);
 
-    // Game Core State
-    let score = 0;
-    let questions = [];
-    let currentQuestionIndex = 0;
-    let secondsRemaining = 90;
-    let gameTimerInterval = null;
-    let questionStartTime = 0;
-    let totalTimeSpent = 0;
-    let correctAnswersCount = 0;
-    
-    // Bonus Round state
-    let isBonusActive = false;
-    let bonusCountdownValue = 10;
-    let bonusTimerInterval = null;
-    let bonusTriggerTimer = 0; // tracker for trigger bonus round every 30 seconds
+  // reset
+  score=0;qIndex=0;correctCount=0;bonusActive=false;lastBonus=0;nextBonusAt=30;noBodyFrames=0;transitioning=false;
+  updateHUD();
 
-    // Floating answers target data for render & physics collision
-    let floatingBoxes = []; // array of { x, y, width, height, value, isCorrect, activeHoverTimer, hue }
-    let particles = []; // particle explosion on success
+  if(typeof Pose==='undefined'){
+    document.getElementById('loadTxt').textContent='โหลดไลบรารีไม่สำเร็จ — ตรวจอินเทอร์เน็ต แล้วรีเฟรช';
+    return;
+  }
+  try{
+    pose=new Pose({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/${f}`});
+    pose.setOptions({modelComplexity:1,smoothLandmarks:true,minDetectionConfidence:0.5,minTrackingConfidence:0.5});
+    pose.onResults(onPose);
 
-    // MediaPipe & Camera Handlers
-    let videoElement = null;
-    let canvasElement = null;
-    let canvasCtx = null;
-    let poseInstance = null;
-    let activeCamera = null;
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:960},height:{ideal:720}},audio:false});
+    video.srcObject=stream;
+    await video.play();
 
-    // Detected Points (Mirrored)
-    let leftHandPos = { x: -100, y: -100, score: 0 };
-    let rightHandPos = { x: -100, y: -100, score: 0 };
-    let hoverState = {
-      boxIndex: -1,
-      startTime: 0,
-      progress: 0
-    };
+    cam=new Camera(video,{onFrame:async()=>{ await pose.send({image:video}); }, width:640, height:480});
+    cam.start();
 
-    // Web Audio Synthesizer Object
-    const synth = {
-      ctx: null,
-      init() {
-        if (!this.ctx) {
-          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-      },
-      playSuccess() {
-        this.init();
-        const now = this.ctx.currentTime;
-        const freqs = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6 arpeggio
-        freqs.forEach((freq, idx) => {
-          const osc = this.ctx.createOscillator();
-          const gain = this.ctx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(freq, now + idx * 0.08);
-          gain.gain.setValueAtTime(0.15, now + idx * 0.08);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.3);
-          osc.connect(gain);
-          gain.connect(this.ctx.destination);
-          osc.start(now + idx * 0.08);
-          osc.stop(now + idx * 0.08 + 0.35);
-        });
-      },
-      playFail() {
-        this.init();
-        const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(220, now);
-        osc.frequency.exponentialRampToValueAtTime(110, now + 0.4);
-        gain.gain.setValueAtTime(0.2, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.45);
-      },
-      playTick() {
-        this.init();
-        const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, now);
-        gain.gain.setValueAtTime(0.05, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.06);
-      },
-      playBonusTrigger() {
-        this.init();
-        const now = this.ctx.currentTime;
-        for (let i = 0; i < 6; i++) {
-          const osc = this.ctx.createOscillator();
-          const gain = this.ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(300 + (i * 150), now + i * 0.05);
-          gain.gain.setValueAtTime(0.1, now + i * 0.05);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.05 + 0.15);
-          osc.connect(gain);
-          gain.connect(this.ctx.destination);
-          osc.start(now + i * 0.05);
-          osc.stop(now + i * 0.05 + 0.2);
-        }
-      },
-      playFanfare() {
-        this.init();
-        const now = this.ctx.currentTime;
-        const root = 523.25; // C5
-        const chords = [root, root * 1.25, root * 1.5, root * 2]; // C, E, G, C6
-        chords.forEach((freq) => {
-          const osc = this.ctx.createOscillator();
-          const gain = this.ctx.createGain();
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(freq, now);
-          gain.gain.setValueAtTime(0.08, now);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
-          osc.connect(gain);
-          gain.connect(this.ctx.destination);
-          osc.start(now);
-          osc.stop(now + 1.3);
-        });
+    document.getElementById('loader').style.display='none';
+    beginRound();
+  }catch(err){
+    document.getElementById('loadTxt').textContent='เปิดกล้องไม่ได้: '+err.message+' (ต้องเปิดผ่าน https และอนุญาตกล้อง)';
+  }
+}
+
+function beginRound(){
+  running=true;
+  gameStart=performance.now();
+  timeLeft=CFG.time;
+  genProblem();
+  updateHUD();
+  if(CFG.time>0){
+    document.getElementById('timerPill').style.display='block';
+    timerId=setInterval(()=>{
+      timeLeft--;
+      const p=document.getElementById('timerPill');
+      p.textContent='⏱️ '+fmt(timeLeft);
+      p.classList.toggle('low',timeLeft<=10);
+      if(timeLeft<=0) endGame(false);
+    },1000);
+    document.getElementById('timerPill').textContent='⏱️ '+fmt(timeLeft);
+  } else {
+    document.getElementById('timerPill').style.display='none';
+  }
+  requestAnimationFrame(loop);
+}
+const fmt=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+
+/* ============ POSE RESULT ============ */
+function onPose(res){
+  hands=[];
+  if(res.poseLandmarks){
+    noBodyFrames=0;
+    document.getElementById('warn').style.display='none';
+    const lm=res.poseLandmarks;
+    // wrists 15/16, index 19/20 — mirror X because video is flipped
+    [15,16,19,20].forEach(i=>{
+      const p=lm[i];
+      if(p && p.visibility>0.3){
+        hands.push({x:(1-p.x)*W, y:p.y*H, id:i});
       }
-    };
+    });
+  } else {
+    noBodyFrames++;
+    if(noBodyFrames>15) document.getElementById('warn').style.display='block';
+  }
+}
 
-    // Initialize application components on window load
-    window.onload = function() {
-      videoElement = document.getElementById('webcam');
-      canvasElement = document.getElementById('game-canvas');
-      canvasCtx = canvasElement.getContext('2d');
+/* ============ MAIN LOOP ============ */
+function loop(ts){
+  if(!running) return;
+  ctx.clearRect(0,0,W,H);
+  const dt=16;
 
-      // Bind config values to views
-      updateConfigLabel('q-count', config.qCount);
-      updateConfigLabel('time', config.totalTime);
-      updateLeaderboardView();
+  // bonus timing
+  if(CFG.time>0){
+    const elapsed=(CFG.time-timeLeft);
+    if(!bonusActive && elapsed>=nextBonusAt){ startBonus(); }
+  }
+  if(bonusActive && performance.now()>bonusDeadline){ endBonus(false); }
 
-      // Hook canvas touch/mouse events for manual simulation
-      setupManualMouseController();
+  // move & draw boxes
+  moveBoxes(dt);
+  drawBoxes();
 
-      // Setup window resize handler for canvas
-      window.addEventListener('resize', handleCanvasResize);
-    };
+  // hand hit detection
+  handleHands();
 
-    // Toggle Screen Views
-    function showScreen(screenId) {
-      document.getElementById('screen-menu').classList.add('hidden');
-      document.getElementById('screen-loading').classList.add('hidden');
-      document.getElementById('screen-gameplay').classList.add('hidden');
-      document.getElementById('screen-gameover').classList.add('hidden');
+  // hand markers
+  drawHands();
 
-      document.getElementById(screenId).classList.remove('hidden');
-      currentScreen = screenId;
+  requestAnimationFrame(loop);
+}
 
-      if (screenId === 'screen-gameplay') {
-        handleCanvasResize();
-      }
+function moveBoxes(dt){
+  const held = holdTarget;
+  boxes.forEach(b=>{
+    if(b===held) return; // frozen while confirming
+    b.x+=b.vx; b.y+=b.vy;
+    if(b.x<0){b.x=0;b.vx*=-1;} if(b.x+b.w>W){b.x=W-b.w;b.vx*=-1;}
+    if(b.y<H*0.28){b.y=H*0.28;b.vy*=-1;} if(b.y+b.h>H){b.y=H-b.h;b.vy*=-1;}
+  });
+}
+
+function drawBoxes(){
+  boxes.forEach(b=>{
+    ctx.save();
+    let fill=b.color;
+    if(b.state==='right') fill='#22c55e';
+    if(b.state==='wrong') fill='#ef4444';
+    // glow if being held
+    if(b===holdTarget){ ctx.shadowColor='#fff'; ctx.shadowBlur=30; }
+    roundRect(b.x,b.y,b.w,b.h,22);
+    const g=ctx.createLinearGradient(0,b.y,0,b.y+b.h);
+    g.addColorStop(0,'#ffffff55'); g.addColorStop(0,fill); g.addColorStop(1,shade(fill,-30));
+    ctx.fillStyle=g; ctx.fill();
+    ctx.lineWidth=6; ctx.strokeStyle='#ffffffcc'; ctx.stroke();
+    ctx.restore();
+
+    // hold progress ring
+    if(b===holdTarget){
+      const prog=Math.min(1,(performance.now()-holdStart)/500);
+      ctx.beginPath();
+      ctx.arc(b.x+b.w/2,b.y-6,14,-Math.PI/2,-Math.PI/2+prog*Math.PI*2);
+      ctx.lineWidth=7; ctx.strokeStyle='#ffd23f'; ctx.stroke();
     }
 
-    // Toggle Control Mode (AI Pose / Manual Mouse)
-    function toggleControlMode() {
-      isManualMode = document.getElementById('control-mode-toggle').checked;
-      const indicator = document.getElementById('manual-mode-indicator');
-      if (isManualMode) {
-        indicator.classList.remove('hidden');
-      } else {
-        indicator.classList.add('hidden');
-      }
+    // number
+    ctx.fillStyle='#fff'; ctx.font='900 '+Math.floor(b.h*0.55)+'px Baloo 2, sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.shadowColor='rgba(0,0,0,.5)'; ctx.shadowBlur=6;
+    ctx.fillText(b.val, b.x+b.w/2, b.y+b.h/2);
+    ctx.shadowBlur=0;
+  });
+}
+
+function drawHands(){
+  hands.forEach(h=>{
+    ctx.save();
+    ctx.shadowColor='#00e5ff'; ctx.shadowBlur=25;
+    ctx.beginPath(); ctx.arc(h.x,h.y,26,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,229,255,.35)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(h.x,h.y,14,0,Math.PI*2);
+    ctx.fillStyle='#eaffff'; ctx.fill();
+    ctx.restore();
+  });
+}
+
+const HIT=70; // hit radius padding
+function handleHands(){
+  if(transitioning||hands.length===0){ holdTarget=null; return; }
+  // find a box any hand is inside (with padding)
+  let touched=null;
+  for(const b of boxes){
+    for(const h of hands){
+      const cx=Math.max(b.x,Math.min(h.x,b.x+b.w));
+      const cy=Math.max(b.y,Math.min(h.y,b.y+b.h));
+      const d=Math.hypot(h.x-cx,h.y-cy);
+      if(d<HIT){ touched=b; break; }
     }
-
-    // Teacher Setup Configurations
-    function setConfig(key, value) {
-      if (key === 'level') {
-        config.level = value;
-        document.getElementById('btn-level-10').className = "config-btn py-2 px-1 bg-white text-gray-700 border border-gray-300 font-semibold rounded-xl text-center text-xs sm:text-sm shadow-sm";
-        document.getElementById('btn-level-20').className = "config-btn py-2 px-1 bg-white text-gray-700 border border-gray-300 font-semibold rounded-xl text-center text-xs sm:text-sm shadow-sm";
-        document.getElementById('btn-level-carry').className = "config-btn py-2 px-1 bg-white text-gray-700 border border-gray-300 font-semibold rounded-xl text-center text-xs sm:text-sm shadow-sm";
-        
-        document.getElementById(`btn-level-${value}`).className = "config-btn py-2 px-1 bg-orange-500 text-white font-semibold rounded-xl text-center text-xs sm:text-sm shadow-md";
-      } else if (key === 'options') {
-        config.optionsCount = parseInt(value);
-        document.getElementById('btn-opt-2').className = "config-btn py-2 px-1 bg-white text-gray-700 border border-gray-300 font-semibold rounded-xl text-center text-xs sm:text-sm shadow-sm";
-        document.getElementById('btn-opt-3').className = "config-btn py-2 px-1 bg-white text-gray-700 border border-gray-300 font-semibold rounded-xl text-center text-xs sm:text-sm shadow-sm";
-        document.getElementById('btn-opt-4').className = "config-btn py-2 px-1 bg-white text-gray-700 border border-gray-300 font-semibold rounded-xl text-center text-xs sm:text-sm shadow-sm";
-        
-        document.getElementById(`btn-opt-${value}`).className = "config-btn py-2 px-1 bg-orange-500 text-white font-semibold rounded-xl text-center text-xs sm:text-sm shadow-md";
-      }
-    }
-
-    function updateConfigLabel(key, value) {
-      if (key === 'q-count') {
-        config.qCount = parseInt(value);
-        document.getElementById('label-q-count').innerText = `${value} ข้อ`;
-        document.getElementById('input-q-count').value = value;
-      } else if (key === 'time') {
-        config.totalTime = parseInt(value);
-        document.getElementById('label-time').innerText = `${value} วินาที`;
-        document.getElementById('input-time').value = value;
-      }
-    }
-
-    // ==================== CORE GAME FLOW ====================
-    function startGame() {
-      // Name Check
-      const rawName = document.getElementById('player-name-input').value.trim();
-      playerName = rawName !== "" ? rawName : "เด็กดีป.1";
-      document.getElementById('display-player-name').innerText = playerName;
-
-      // Transition to Loading Screen
-      showScreen('screen-loading');
-      document.getElementById('calibration-area').classList.add('hidden');
-      document.getElementById('loading-title').innerText = "ระบบกำลังโหลดหุ่นยนต์ AI...";
-      document.getElementById('loading-subtext').innerText = "โปรดส่องกล้องในบริเวณที่สว่างพอดี และเปิดพื้นที่ด้านหน้าเครื่องนะเด็กๆ!";
-
-      // Initialize Synthesizer
-      synth.init();
-
-      // Check Mode
-      if (isManualMode) {
-        // Skip Camera AI setup
-        setTimeout(() => {
-          document.getElementById('loading-title').innerText = "พร้อมวิ่งแตะคำตอบแล้ว!";
-          document.getElementById('calibration-area').classList.remove('hidden');
-        }, 1200);
-      } else {
-        // Setup MediaPipe Camera Detection
-        setupCameraAndAI();
-      }
-    }
-
-    // MediaPipe Pose & Camera initialization
-    function setupCameraAndAI() {
-      if (isWebcamActive) {
-        // Already active
-        document.getElementById('loading-title').innerText = "พร้อมเข้าเส้นชัยแล้ว!";
-        document.getElementById('calibration-area').classList.remove('hidden');
-        return;
-      }
-
-      poseInstance = new Pose({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
-      });
-
-      poseInstance.setOptions({
-        modelComplexity: 1,
-        smoothLandmarks: true,
-        enableSegmentation: false,
-        smoothSegmentation: false,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5
-      });
-
-      poseInstance.onResults(onPoseResults);
-
-      activeCamera = new Camera(videoElement, {
-        onFrame: async () => {
-          if (currentScreen === 'screen-gameplay' || currentScreen === 'screen-loading') {
-            await poseInstance.send({ image: videoElement });
-          }
-        },
-        width: 640,
-        height: 480
-      });
-
-      activeCamera.start()
-        .then(() => {
-          isWebcamActive = true;
-          document.getElementById('loading-title').innerText = "AI เชื่อมต่อกล้องเสร็จสมบูรณ์!";
-          document.getElementById('calibration-area').classList.remove('hidden');
-        })
-        .catch(err => {
-          console.error("Camera access failed: ", err);
-          document.getElementById('loading-title').innerText = "ไม่สามารถเข้าถึงกล้องหน้าได้!";
-          document.getElementById('loading-subtext').innerHTML = `
-            <div class="text-red-500 font-bold mb-4">โปรดตรวจสอบการอนุญาตเข้าถึงกล้องเบราว์เซอร์</div>
-            <button onclick="activateManualModeAndContinue()" class="px-4 py-2 bg-green-500 text-white font-bold rounded-xl shadow-md">
-              สลับเป็นโหมดสัมผัส/เมาส์แทนและเล่นต่อ
-            </button>
-          `;
-        });
-    }
-
-    function activateManualModeAndContinue() {
-      isManualMode = true;
-      document.getElementById('control-mode-toggle').checked = true;
-      toggleControlMode();
-      document.getElementById('loading-title').innerText = "พร้อมรันในโหมดควบคุมด้วยมือ!";
-      document.getElementById('calibration-area').classList.remove('hidden');
-    }
-
-    function startActionPhase() {
-      // Build Arithmetic Problem list
-      generateAllQuestions();
-      
-      // Reset Stats variables
-      score = 0;
-      currentQuestionIndex = 0;
-      secondsRemaining = config.totalTime;
-      correctAnswersCount = 0;
-      totalTimeSpent = 0;
-      isBonusActive = false;
-      bonusTriggerTimer = 0;
-
-      document.getElementById('display-score').innerText = score;
-      document.getElementById('display-timer').querySelector('span').innerText = `${secondsRemaining}s`;
-      document.getElementById('display-q-index').innerText = `1/${config.qCount}`;
-
-      // Transition to Gameplay Scene
-      showScreen('screen-gameplay');
-      
-      // Spawn First Question
-      spawnQuestion(0);
-
-      // Start Countdown Clocks
-      startGameTimer();
-
-      // Trigger standard render loop
-      requestAnimationFrame(gameRenderLoop);
-    }
-
-    // Dynamic Math Question Generator Engine
-    function generateAllQuestions() {
-      questions = [];
-      for (let i = 0; i < config.qCount; i++) {
-        questions.push(generateSingleQuestion(config.level));
-      }
-    }
-
-    function generateSingleQuestion(levelMode) {
-      let valA, valB, answer, equationStr;
-      
-      if (levelMode === '10') {
-        // Result sum <= 10
-        valA = Math.floor(Math.random() * 8) + 1; // 1 to 8
-        valB = Math.floor(Math.random() * (10 - valA)) + 1; // ensures sum <= 10
-      } else if (levelMode === '20') {
-        // Result sum <= 20
-        valA = Math.floor(Math.random() * 16) + 2; // 2 to 17
-        valB = Math.floor(Math.random() * (20 - valA)) + 1; // ensures sum <= 20
-      } else {
-        // Carry (บวกเลขแบบมีทด)
-        // Usually sum <= 30 with unit sum >= 10
-        const unitA = Math.floor(Math.random() * 5) + 5; // 5 to 9
-        const unitB = Math.floor(Math.random() * 5) + 5; // 5 to 9
-        const tenA = Math.floor(Math.random() * 2) * 10; // 0 or 10
-        valA = tenA + unitA;
-        valB = unitB;
-      }
-
-      answer = valA + valB;
-      equationStr = `${valA} + ${valB} = ?`;
-
-      // Generate distracting options
-      const distractorSet = new Set();
-      distractorSet.add(answer);
-
-      // Add near-miss foil values
-      while (distractorSet.size < config.optionsCount) {
-        const offset = (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 3) + 1);
-        const wrongOption = answer + offset;
-        if (wrongOption > 0 && wrongOption !== answer) {
-          distractorSet.add(wrongOption);
-        }
-      }
-
-      // Convert set to array and shuffle
-      const shuffledOptions = Array.from(distractorSet).sort(() => Math.random() - 0.5);
-
-      return {
-        equation: equationStr,
-        answer: answer,
-        options: shuffledOptions
-      };
-    }
-
-    // Populate Box items to floating coordinate fields
-    function spawnQuestion(idx) {
-      currentQuestionIndex = idx;
-      questionStartTime = Date.now();
-      
-      const qData = questions[idx];
-      
-      // Update HUD elements
-      document.getElementById('math-equation-text').innerText = qData.equation;
-      document.getElementById('display-q-index').innerText = `${idx + 1}/${config.qCount}`;
-
-      // Reset HUD style if returning from Bonus round
-      if (isBonusActive) {
-        document.getElementById('math-question-bubble').className = "absolute top-4 left-1/2 -translate-x-1/2 bg-yellow-400 border-4 border-yellow-300 px-6 py-3 rounded-2xl shadow-xl text-center z-10 transition-transform scale-105 duration-300";
-        document.getElementById('question-sub-title').innerText = "🔥 ด่านโบนัสสุดพลัง! (คะแนน x5) 🔥";
-      } else {
-        document.getElementById('math-question-bubble').className = "absolute top-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm border-4 border-pink-400 px-6 py-3 rounded-2xl shadow-xl text-center z-10 transition-transform scale-100 duration-300";
-        document.getElementById('question-sub-title').innerText = "วิ่งเอาตัวไปจิ้มคำตอบกันเลยเด็กๆ!";
-      }
-
-      floatingBoxes = [];
-      const optsCount = qData.options.length;
-
-      // Position logic configurations
-      // Responsive layout: Place options horizontally centered
-      for (let i = 0; i < optsCount; i++) {
-        let relX = 0;
-        let relY = 0.55; // Vertical alignment centered mid-bottom for easier physical touches
-
-        if (optsCount === 2) {
-          relX = (i === 0) ? 0.25 : 0.75;
-        } else if (optsCount === 3) {
-          relX = (i === 0) ? 0.20 : (i === 1) ? 0.50 : 0.80;
-        } else if (optsCount === 4) {
-          relX = (i === 0) ? 0.15 : (i === 1) ? 0.38 : (i === 2) ? 0.62 : 0.85;
-        }
-
-        // Hues for colorful comic buttons
-        const boxHues = [20, 150, 200, 280]; // Red/Orange, Green, Blue, Purple
-
-        floatingBoxes.push({
-          x: relX, // relative
-          y: relY, // relative
-          width: 140, // standard width (will auto scale on rendering)
-          height: 100, // standard height
-          value: qData.options[i],
-          isCorrect: qData.options[i] === qData.answer,
-          hoverTimer: 0, // progress meter (0 to 1000 ms)
-          hue: boxHues[i % boxHues.length]
-        });
-      }
-
-      // Reset hand touch interactions
-      hoverState.boxIndex = -1;
-      hoverState.progress = 0;
-    }
-
-    // Global Time Countdown Interval loop
-    function startGameTimer() {
-      if (gameTimerInterval) clearInterval(gameTimerInterval);
-      
-      gameTimerInterval = setInterval(() => {
-        if (currentScreen !== 'screen-gameplay') return;
-
-        // Decrease time
-        secondsRemaining--;
-        bonusTriggerTimer++;
-
-        document.getElementById('display-timer').querySelector('span').innerText = `${secondsRemaining}s`;
-
-        // Check Trigger Bonus Round every 30 seconds
-        if (bonusTriggerTimer >= 30 && !isBonusActive) {
-          triggerBonusRound();
-        }
-
-        if (secondsRemaining <= 0) {
-          endGame();
-        }
-      }, 1000);
-    }
-
-    // Trigger Super Special 10-Second Bonus Round
-    function triggerBonusRound() {
-      isBonusActive = true;
-      bonusTriggerTimer = 0;
-      bonusCountdownValue = 10;
-      
-      synth.playBonusTrigger();
-
-      // Show floating Bonus banner on HUD
-      const bonusBanner = document.getElementById('bonus-banner');
-      bonusBanner.classList.remove('hidden');
-
-      // Create a super special bonus math question
-      const bonusQ = generateSingleQuestion(config.level === 'carry' ? 'carry' : '20');
-      questions.splice(currentQuestionIndex + 1, 0, bonusQ); // Insert immediately after the current index
-      
-      // Render Bonus Alert Banner
-      showFeedback('⚡ รอบโบนัสมาถึงแล้ว! ⚡', 'ตอบถูกด่านนี้เพื่อรับพิเศษ +50 คะแนน ทันที!', '🎉', 'border-yellow-400 text-yellow-500');
-
-      setTimeout(() => {
-        spawnQuestion(currentQuestionIndex + 1);
-      }, 2000);
-
-      // Dedicated Bonus timer countdown
-      if (bonusTimerInterval) clearInterval(bonusTimerInterval);
-      bonusTimerInterval = setInterval(() => {
-        bonusCountdownValue--;
-        if (bonusCountdownValue <= 0 || !isBonusActive) {
-          closeBonusRound();
-        }
-      }, 1000);
-    }
-
-    function closeBonusRound() {
-      isBonusActive = false;
-      if (bonusTimerInterval) {
-        clearInterval(bonusTimerInterval);
-        bonusTimerInterval = null;
-      }
-      document.getElementById('bonus-banner').classList.add('hidden');
-    }
-
-    // Particle Explosion Engine
-    function spawnConfetti(centerX, centerY, colorHue) {
-      const pCount = 30;
-      for (let i = 0; i < pCount; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = Math.random() * 6 + 4;
-        particles.push({
-          x: centerX,
-          y: centerY,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed - (Math.random() * 3 + 1), // upward force offset
-          radius: Math.random() * 8 + 4,
-          hue: colorHue !== undefined ? colorHue : Math.floor(Math.random() * 360),
-          alpha: 1,
-          decay: Math.random() * 0.02 + 0.015,
-          gravity: 0.15
-        });
-      }
-    }
-
-    // MediaPipe callback handler
-    function onPoseResults(results) {
-      if (currentScreen !== 'screen-gameplay' && currentScreen !== 'screen-loading') return;
-
-      if (!results.poseLandmarks) {
-        // Reset hands pos offscreen
-        leftHandPos.score = 0;
-        rightHandPos.score = 0;
-        return;
-      }
-
-      // Landmarks indices: 15 (left_wrist), 16 (right_wrist)
-      const leftWrist = results.poseLandmarks[15];
-      const rightWrist = results.poseLandmarks[16];
-
-      // Convert Normalized camera coordinates into mirrored Canvas coords
-      if (leftWrist && leftWrist.visibility > 0.5) {
-        leftHandPos.x = (1 - leftWrist.x); // Mirrored mapping
-        leftHandPos.y = leftWrist.y;
-        leftHandPos.score = leftWrist.visibility;
-      } else {
-        leftHandPos.score = 0;
-      }
-
-      if (rightWrist && rightWrist.visibility > 0.5) {
-        rightHandPos.x = (1 - rightWrist.x); // Mirrored mapping
-        rightHandPos.y = rightWrist.y;
-        rightHandPos.score = rightWrist.visibility;
-      } else {
-        rightHandPos.score = 0;
-      }
-    }
-
-    // Touch/Click controller simulation binding for manual devices
-    function setupManualMouseController() {
-      canvasElement.addEventListener('mousemove', (e) => {
-        if (!isManualMode || currentScreen !== 'screen-gameplay') return;
-        const rect = canvasElement.getBoundingClientRect();
-        // Mimic touch coordinates directly with standard mouse
-        const relativeMouseX = (e.clientX - rect.left) / rect.width;
-        const relativeMouseY = (e.clientY - rect.top) / rect.height;
-
-        rightHandPos.x = relativeMouseX;
-        rightHandPos.y = relativeMouseY;
-        rightHandPos.score = 1.0; // always visible inside simulator
-      });
-
-      canvasElement.addEventListener('mousedown', (e) => {
-        if (!isManualMode || currentScreen !== 'screen-gameplay') return;
-        // Instant tap trigger
-        const rect = canvasElement.getBoundingClientRect();
-        const clickX = (e.clientX - rect.left) / rect.width;
-        const clickY = (e.clientY - rect.top) / rect.height;
-
-        floatingBoxes.forEach((box, index) => {
-          const actualX = box.x * canvasElement.width - box.width / 2;
-          const actualY = box.y * canvasElement.height - box.height / 2;
-          const mapClickX = clickX * canvasElement.width;
-          const mapClickY = clickY * canvasElement.height;
-
-          if (mapClickX >= actualX && mapClickX <= actualX + box.width &&
-              mapClickY >= actualY && mapClickY <= actualY + box.height) {
-            evaluateChoice(index);
-          }
-        });
-      });
-
-      // Handle mobile touch simulation
-      canvasElement.addEventListener('touchmove', (e) => {
-        if (!isManualMode || currentScreen !== 'screen-gameplay') return;
-        e.preventDefault();
-        const rect = canvasElement.getBoundingClientRect();
-        const touch = e.touches[0];
-        const relativeTouchX = (touch.clientX - rect.left) / rect.width;
-        const relativeTouchY = (touch.clientY - rect.top) / rect.height;
-
-        rightHandPos.x = relativeTouchX;
-        rightHandPos.y = relativeTouchY;
-        rightHandPos.score = 1.0;
-      });
-
-      canvasElement.addEventListener('touchstart', (e) => {
-        if (!isManualMode || currentScreen !== 'screen-gameplay') return;
-        const rect = canvasElement.getBoundingClientRect();
-        const touch = e.touches[0];
-        const clickX = (touch.clientX - rect.left) / rect.width;
-        const clickY = (touch.clientY - rect.top) / rect.height;
-
-        floatingBoxes.forEach((box, index) => {
-          const actualX = box.x * canvasElement.width - box.width / 2;
-          const actualY = box.y * canvasElement.height - box.height / 2;
-          const mapClickX = clickX * canvasElement.width;
-          const mapClickY = clickY * canvasElement.height;
-
-          if (mapClickX >= actualX && mapClickX <= actualX + box.width &&
-              mapClickY >= actualY && mapClickY <= actualY + box.height) {
-            evaluateChoice(index);
-          }
-        });
-      });
-    }
-
-    // Dynamic resize sync
-    function handleCanvasResize() {
-      if (!canvasElement) return;
-      const parent = canvasElement.parentElement;
-      canvasElement.width = parent.clientWidth;
-      canvasElement.height = parent.clientHeight;
-    }
-
-    // ==================== RENDERING ENGINE ====================
-    let lastTime = 0;
-    function gameRenderLoop(timestamp) {
-      if (currentScreen !== 'screen-gameplay') return;
-
-      const deltaTime = timestamp - lastTime || 0;
-      lastTime = timestamp;
-
-      // Ensure canvas maintains aspect ratio matching parent
-      if (canvasElement.width !== canvasElement.parentElement.clientWidth ||
-          canvasElement.height !== canvasElement.parentElement.clientHeight) {
-        handleCanvasResize();
-      }
-
-      const w = canvasElement.width;
-      const h = canvasElement.height;
-
-      // Draw Base Layer: camera stream frame
-      canvasCtx.save();
-      if (isWebcamActive && !isManualMode) {
-        // Mirror current frame stream back
-        canvasCtx.translate(w, 0);
-        canvasCtx.scale(-1, 1);
-        canvasCtx.drawImage(videoElement, 0, 0, w, h);
-      } else {
-        // Simulator Dark Aesthetic Grid Background
-        const gradient = canvasCtx.createLinearGradient(0, 0, 0, h);
-        gradient.addColorStop(0, '#1e1b4b'); // indigo-950
-        gradient.addColorStop(1, '#0f172a'); // slate-900
-        canvasCtx.fillStyle = gradient;
-        canvasCtx.fillRect(0, 0, w, h);
-
-        // Simple digital design lines
-        canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-        canvasCtx.lineWidth = 2;
-        for (let i = 0; i < w; i += 40) {
-          canvasCtx.beginPath();
-          canvasCtx.moveTo(i, 0);
-          canvasCtx.lineTo(i, h);
-          canvasCtx.stroke();
-        }
-        for (let j = 0; j < h; j += 40) {
-          canvasCtx.beginPath();
-          canvasCtx.moveTo(0, j);
-          canvasCtx.lineTo(w, j);
-          canvasCtx.stroke();
-        }
-      }
-      canvasCtx.restore();
-
-      // Check Touch Box Collision for AI Track Points
-      let currentCollidingIndex = -1;
-
-      // Standardize relative dimension values
-      floatingBoxes.forEach((box) => {
-        box.width = Math.min(180, w * 0.22);
-        box.height = Math.min(125, h * 0.20);
-      });
-
-      // Detect collisions for both left and right tracker points
-      const hands = [];
-      if (leftHandPos.score > 0.4) hands.push(leftHandPos);
-      if (rightHandPos.score > 0.4) hands.push(rightHandPos);
-
-      // Evaluate active box intersection
-      floatingBoxes.forEach((box, boxIndex) => {
-        let isTouched = false;
-        
-        hands.forEach(hand => {
-          const pX = hand.x * w;
-          const pY = hand.y * h;
-
-          const boxX = box.x * w - box.width / 2;
-          const boxY = box.y * h - box.height / 2;
-
-          if (pX >= boxX && pX <= boxX + box.width &&
-              pY >= boxY && pY <= boxY + box.height) {
-            isTouched = true;
-          }
-        });
-
-        if (isTouched) {
-          currentCollidingIndex = boxIndex;
-        }
-      });
-
-      // Update Selection Progress Bar timer
-      if (currentCollidingIndex !== -1 && !isManualMode) {
-        if (hoverState.boxIndex === currentCollidingIndex) {
-          const duration = Date.now() - hoverState.startTime;
-          hoverState.progress = Math.min(1.0, duration / 1000); // 1-second full validation trigger
-
-          if (duration >= 1000) {
-            evaluateChoice(currentCollidingIndex);
-            hoverState.boxIndex = -1; // reset
-            hoverState.progress = 0;
-          }
-        } else {
-          hoverState.boxIndex = currentCollidingIndex;
-          hoverState.startTime = Date.now();
-          hoverState.progress = 0;
-          synth.playTick(); // Tick Sound on entry
-        }
-      } else {
-        if (!isManualMode) {
-          hoverState.boxIndex = -1;
-          hoverState.progress = 0;
-        }
-      }
-
-      // Render Math target Boxes on Canvas screen
-      floatingBoxes.forEach((box, idx) => {
-        const bW = box.width;
-        const bH = box.height;
-        const bX = box.x * w - bW / 2;
-        const bY = box.y * h - bH / 2;
-
-        canvasCtx.save();
-        
-        // Glow Shadow Effect
-        canvasCtx.shadowBlur = 15;
-        canvasCtx.shadowColor = `hsla(${box.hue}, 90%, 60%, 0.5)`;
-
-        // Box border and body styling
-        const isHovered = (hoverState.boxIndex === idx);
-        const activeScale = isHovered ? 1.08 : 1.0;
-        
-        canvasCtx.translate(bX + bW/2, bY + bH/2);
-        canvasCtx.scale(activeScale, activeScale);
-        canvasCtx.translate(-(bX + bW/2), -(bY + bH/2));
-
-        // Draw Comic Rounded Card background
-        const radius = 24;
-        canvasCtx.beginPath();
-        canvasCtx.roundRect(bX, bY, bW, bH, radius);
-        
-        // Base colorful fill
-        const bgGradient = canvasCtx.createLinearGradient(bX, bY, bX, bY + bH);
-        bgGradient.addColorStop(0, `hsl(${box.hue}, 95%, 70%)`);
-        bgGradient.addColorStop(1, `hsl(${box.hue}, 90%, 50%)`);
-        canvasCtx.fillStyle = bgGradient;
-        canvasCtx.fill();
-
-        // High contrast comic stroke outline
-        canvasCtx.strokeStyle = '#FFFFFF';
-        canvasCtx.lineWidth = 6;
-        canvasCtx.stroke();
-
-        canvasCtx.strokeStyle = '#2c3e50';
-        canvasCtx.lineWidth = 2;
-        canvasCtx.stroke();
-
-        // Render Answer Values inside Boxes
-        canvasCtx.shadowBlur = 0;
-        canvasCtx.fillStyle = '#FFFFFF';
-        canvasCtx.font = `bold ${Math.min(55, bH * 0.5)}px Sarabun, Mitr, system-ui`;
-        canvasCtx.textAlign = 'center';
-        canvasCtx.textBaseline = 'middle';
-        // Stroke outline for numbers to make them stand out
-        canvasCtx.strokeStyle = '#1e293b';
-        canvasCtx.lineWidth = 6;
-        canvasCtx.strokeText(box.value, bX + bW / 2, bY + bH / 2 + 3);
-        canvasCtx.fillText(box.value, bX + bW / 2, bY + bH / 2 + 3);
-
-        // If hovered, draw circular loading validation bar overlay
-        if (isHovered && hoverState.progress > 0) {
-          canvasCtx.beginPath();
-          // Position arc at top-right or center
-          canvasCtx.arc(bX + bW - 25, bY + 25, 14, 0, Math.PI * 2);
-          canvasCtx.fillStyle = 'rgba(0,0,0,0.4)';
-          canvasCtx.fill();
-
-          canvasCtx.beginPath();
-          canvasCtx.arc(bX + bW - 25, bY + 25, 14, -Math.PI / 2, (-Math.PI / 2) + (Math.PI * 2 * hoverState.progress));
-          canvasCtx.strokeStyle = '#4ADE80';
-          canvasCtx.lineWidth = 4;
-          canvasCtx.stroke();
-        }
-
-        canvasCtx.restore();
-      });
-
-      // Render Particle Systems (Confetti / Star Dust)
-      particles.forEach((p, idx) => {
-        p.x += p.vx;
-        p.vy += p.vy * 0.05 + p.gravity;
-        p.y += p.vy;
-        p.alpha -= p.decay;
-
-        if (p.alpha <= 0) {
-          particles.splice(idx, 1);
-          return;
-        }
-
-        canvasCtx.save();
-        canvasCtx.globalAlpha = p.alpha;
-        canvasCtx.fillStyle = `hsl(${p.hue}, 90%, 60%)`;
-        
-        // Draw star or circle
-        canvasCtx.beginPath();
-        canvasCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        canvasCtx.fill();
-        canvasCtx.restore();
-      });
-
-      // Render Detected Hand cursors
-      hands.forEach((hand, idx) => {
-        const hX = hand.x * w;
-        const hY = hand.y * h;
-
-        canvasCtx.save();
-        
-        // Outer pulsing ring aura
-        canvasCtx.shadowBlur = 10;
-        canvasCtx.shadowColor = (idx === 0) ? '#FB7185' : '#38BDF8';
-
-        canvasCtx.beginPath();
-        canvasCtx.arc(hX, hY, 15, 0, Math.PI * 2);
-        canvasCtx.fillStyle = (idx === 0) ? 'rgba(251, 113, 133, 0.8)' : 'rgba(56, 189, 248, 0.8)';
-        canvasCtx.fill();
-
-        canvasCtx.strokeStyle = '#FFFFFF';
-        canvasCtx.lineWidth = 3;
-        canvasCtx.stroke();
-
-        // Inner glowing white core
-        canvasCtx.beginPath();
-        canvasCtx.arc(hX, hY, 6, 0, Math.PI * 2);
-        canvasCtx.fillStyle = '#FFFFFF';
-        canvasCtx.fill();
-
-        // Mini hand labels for kids to learn Left/Right directions
-        canvasCtx.fillStyle = '#1e293b';
-        canvasCtx.font = 'bold 10px Sarabun, Mitr';
-        canvasCtx.textAlign = 'center';
-        
-        const isLeftHand = (hand === leftHandPos);
-        const handLabelText = isLeftHand ? 'มือซ้าย 🖐️' : 'มือขวา 🖐️';
-        
-        // Draw Background Label Badge
-        const labelW = 45;
-        canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        canvasCtx.beginPath();
-        canvasCtx.roundRect(hX - labelW/2, hY - 32, labelW, 14, 4);
-        canvasCtx.fill();
-        
-        canvasCtx.fillStyle = '#1e293b';
-        canvasCtx.fillText(handLabelText, hX, hY - 22);
-
-        canvasCtx.restore();
-      });
-
-      // Keep running animation loop frame
-      requestAnimationFrame(gameRenderLoop);
-    }
-
-    // ==================== CHOICE EVALUATION ENGINE ====================
-    let isEvaluating = false;
-    
-    function evaluateChoice(index) {
-      if (isEvaluating) return;
-      isEvaluating = true;
-
-      const selectedBox = floatingBoxes[index];
-      const selectedBoxActualX = selectedBox.x * canvasElement.width;
-      const selectedBoxActualY = selectedBox.y * canvasElement.height;
-
-      // Track time spent for accuracy telemetry data
-      const timeSpentOnQuestion = (Date.now() - questionStartTime) / 1000;
-      totalTimeSpent += timeSpentOnQuestion;
-
-      if (selectedBox.isCorrect) {
-        // Correct Action
-        correctAnswersCount++;
-        
-        // Evaluate Points: Standard (+10) vs Bonus round (+50)
-        const earnedPoints = isBonusActive ? 50 : 10;
-        score += earnedPoints;
-        document.getElementById('display-score').innerText = score;
-
-        // Screen flash green success effect
-        const arena = canvasElement.parentElement;
-        arena.classList.add('flash-success');
-        setTimeout(() => arena.classList.remove('flash-success'), 600);
-
-        // Confetti burst
-        spawnConfetti(selectedBoxActualX, selectedBoxActualY, selectedBox.hue);
-        synth.playSuccess();
-
-        showFeedback('เก่งมากๆ เลยคร้าบ! 🎉', `คำตอบที่ถูกต้องคือ ${selectedBox.value} (+${earnedPoints} คะแนน)`, '🥇', 'border-green-400 text-green-500');
-
-      } else {
-        // Wrong Action
-        score = Math.max(0, score - 5); // deduct points
-        document.getElementById('display-score').innerText = score;
-
-        // Screen flash red error effect
-        const arena = canvasElement.parentElement;
-        arena.classList.add('flash-error');
-        setTimeout(() => arena.classList.remove('flash-error'), 600);
-
-        synth.playFail();
-
-        const correctAns = questions[currentQuestionIndex].answer;
-        showFeedback('ลองใหม่อีกทีนะคนเก่ง! 💪', `เฉลัย: คำตอบที่ถูกคือ ${correctAns}นะจ๊ะ (-5 คะแนน)`, '❌', 'border-red-400 text-red-500');
-      }
-
-      // Load Next question with animated delay
-      setTimeout(() => {
-        hideFeedback();
-        
-        // Stop Bonus conditions
-        if (isBonusActive) {
-          closeBonusRound();
-          // Remove injected bonus card
-          questions.splice(currentQuestionIndex + 1, 1);
-        }
-
-        const nextIndex = currentQuestionIndex + 1;
-        if (nextIndex < questions.length && secondsRemaining > 0) {
-          spawnQuestion(nextIndex);
-          isEvaluating = false;
-        } else {
-          endGame();
-        }
-      }, 2000);
-    }
-
-    // Interactive custom modal banner inside overlay canvas
-    function showFeedback(title, desc, icon, borderStyles) {
-      const overlay = document.getElementById('feedback-overlay');
-      const card = document.getElementById('feedback-card');
-      const iconEl = document.getElementById('feedback-icon');
-      const titleEl = document.getElementById('feedback-title');
-      const descEl = document.getElementById('feedback-desc');
-
-      iconEl.innerText = icon;
-      titleEl.innerText = title;
-      descEl.innerText = desc;
-
-      card.className = `bg-white/95 border-8 p-6 md:p-10 rounded-3xl shadow-2xl flex flex-col items-center max-w-sm text-center transform scale-100 transition-transform duration-300 ${borderStyles}`;
-      
-      overlay.classList.remove('opacity-0');
-      overlay.classList.add('opacity-100');
-    }
-
-    function hideFeedback() {
-      const overlay = document.getElementById('feedback-overlay');
-      overlay.classList.remove('opacity-100');
-      overlay.classList.add('opacity-0');
-    }
-
-    // ==================== ENDGAME & LOCAL LEADERBOARD ====================
-    function endGame() {
-      isEvaluating = false;
-      closeBonusRound();
-      if (gameTimerInterval) clearInterval(gameTimerInterval);
-
-      // Web Audio Victory fanfare
-      synth.playFanfare();
-
-      // Telemetry Analytics Calculation
-      const avgTime = correctAnswersCount > 0 ? (totalTimeSpent / currentQuestionIndex).toFixed(1) : "0.0";
-
-      // Show summary values
-      document.getElementById('summary-score').innerText = score;
-      document.getElementById('summary-correct').innerText = `${correctAnswersCount}/${currentQuestionIndex + 1} ข้อ`;
-      document.getElementById('summary-avg-time').innerText = `${avgTime} วินาที`;
-
-      // Save user to LocalStorage Leaderboard
-      savePlayerToLeaderboard(playerName, score, avgTime);
-
-      // Transition Scene
-      showScreen('screen-gameover');
-    }
-
-    function savePlayerToLeaderboard(name, scoreValue, avgTimeValue) {
-      const storeKey = 'running_math_p1_leaderboard';
-      let list = [];
-      try {
-        const stored = localStorage.getItem(storeKey);
-        if (stored) list = JSON.parse(stored);
-      } catch (e) {
-        console.error("Localstorage load error: ", e);
-      }
-
-      // Add current player run record
-      list.push({
-        name: name,
-        score: scoreValue,
-        avgTime: parseFloat(avgTimeValue),
-        date: new Date().toLocaleDateString('th-TH')
-      });
-
-      // Sort criteria: High score descending, then by average response speed ascending
-      list.sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        return a.avgTime - b.avgTime;
-      });
-
-      // Keep top 10 rows
-      const top10 = list.slice(0, 10);
-
-      try {
-        localStorage.setItem(storeKey, JSON.stringify(top10));
-      } catch (e) {
-        console.error("Localstorage save error: ", e);
-      }
-
-      // Refresh HUD components
-      updateLeaderboardView();
-    }
-
-    function updateLeaderboardView() {
-      const storeKey = 'running_math_p1_leaderboard';
-      const rowsContainer = document.getElementById('leaderboard-rows');
-      rowsContainer.innerHTML = '';
-
-      let list = [];
-      try {
-        const stored = localStorage.getItem(storeKey);
-        if (stored) list = JSON.parse(stored);
-      } catch (e) {
-        console.error(e);
-      }
-
-      if (list.length === 0) {
-        rowsContainer.innerHTML = `
-          <tr>
-            <td colspan="4" class="text-center py-4 text-gray-400 italic font-medium">ยังไม่มีสถิติฮีโร่นักวิ่ง มาประเดิมคนแรกกันเถอะ!</td>
-          </tr>
-        `;
-        return;
-      }
-
-      list.forEach((player, idx) => {
-        let rankBadge = `${idx + 1}`;
-        if (idx === 0) rankBadge = '🥇';
-        else if (idx === 1) rankBadge = '🥈';
-        else if (idx === 2) rankBadge = '🥉';
-
-        const row = document.createElement('tr');
-        row.className = "border-b border-indigo-50/50 hover:bg-indigo-100/30 transition-colors";
-        row.innerHTML = `
-          <td class="py-2 pl-2 font-bold">${rankBadge}</td>
-          <td class="py-2 font-semibold text-gray-800">${escapeHtml(player.name)}</td>
-          <td class="py-2 text-center font-black text-orange-500">${player.score}</td>
-          <td class="py-2 pr-2 text-right text-indigo-600 font-bold">${player.avgTime}s</td>
-        `;
-        rowsContainer.appendChild(row);
-      });
-    }
-
-    // Helper Utility for escaping HTML strings
-    function escapeHtml(str) {
-      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-    }
-
-    // Flow Redirect Actions
-    function resetGameToSetup() {
-      showScreen('screen-menu');
-    }
-
-    function restartGamePlay() {
-      startActionPhase();
-    }
-  </script>
+    if(touched) break;
+  }
+  if(touched){
+    if(holdTarget!==touched){ holdTarget=touched; holdStart=performance.now(); }
+    else if(performance.now()-holdStart>=500){ confirm(touched); }
+  } else {
+    holdTarget=null;
+  }
+}
+
+/* ============ ANSWER ============ */
+function confirm(box){
+  transitioning=true; holdTarget=null;
+  const isBonus=bonusActive;
+  if(box.correct){
+    box.state='right';
+    let pts=isBonus?50:10;
+    score+=pts; correctCount++;
+    if(isBonus) endBonus(true);
+    banner(isBonus?'⭐ +50! สุดยอด!':'🎉 เก่งมาก! +10','#22c55e');
+    beep(880,0.12); setTimeout(()=>beep(1175,0.16),120);
+  } else {
+    box.state='wrong';
+    score=Math.max(0,score-5);
+    banner('💪 ลองใหม่นะ! คำตอบคือ '+answer,'#ef4444');
+    beep(200,0.25);
+  }
+  updateHUD();
+  setTimeout(nextQuestion, box.correct?900:1400);
+}
+
+function nextQuestion(){
+  qIndex++;
+  transitioning=false;
+  if(CFG.time===0 && qIndex>=CFG.count){ endGame(false); return; }
+  if(qIndex>=CFG.count && CFG.time>0){ endGame(false); return; }
+  genProblem();
+  updateHUD();
+}
+
+/* ============ BONUS ============ */
+function startBonus(){
+  bonusActive=true; bonusDeadline=performance.now()+10000; nextBonusAt+=30;
+  document.getElementById('bonusFlag').style.display='block';
+  document.getElementById('questionBar').style.borderColor='#ff3d9a';
+  beep(660,0.1); setTimeout(()=>beep(990,0.1),100); setTimeout(()=>beep(1320,0.15),200);
+}
+function endBonus(){
+  bonusActive=false;
+  document.getElementById('bonusFlag').style.display='none';
+  document.getElementById('questionBar').style.borderColor='var(--sun)';
+}
+
+/* ============ HUD / BANNER ============ */
+function updateHUD(){
+  document.getElementById('scorePill').textContent='⭐ '+score;
+  const total=CFG.time>0?'∞':CFG.count;
+  document.getElementById('qPill').textContent=(Math.min(qIndex+1,CFG.count))+'/'+CFG.count;
+}
+function banner(txt,color){
+  const el=document.getElementById('banner');
+  el.textContent=txt; el.style.color=color;
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+}
+
+/* ============ END ============ */
+function endGame(manual){
+  if(!running && !manual) return;
+  running=false;
+  if(timerId){clearInterval(timerId);timerId=null;}
+  stopMedia();
+  const totalTime=(performance.now()-gameStart)/1000;
+  const avg=correctCount>0?(totalTime/Math.max(1,qIndex||correctCount)).toFixed(1):'0';
+  document.getElementById('sScore').textContent=score;
+  document.getElementById('sCorrect').textContent=correctCount;
+  document.getElementById('sAvg').textContent=avg;
+  saveScore(score);
+  renderBoard('boardTable');
+  show('summaryScreen');
+}
+
+function stopMedia(){
+  try{ if(cam){cam.stop();cam=null;} }catch(e){}
+  try{ if(video&&video.srcObject){video.srcObject.getTracks().forEach(t=>t.stop());video.srcObject=null;} }catch(e){}
+}
+function stopEverything(){ running=false; if(timerId){clearInterval(timerId);timerId=null;} stopMedia(); }
+
+/* ============ LEADERBOARD (localStorage) ============ */
+const LS_KEY='wingTaeScores';
+function saveScore(s){
+  const name=(document.getElementById('playerName').value||'ผู้เล่น').trim().slice(0,14);
+  let list=[]; try{ list=JSON.parse(localStorage.getItem(LS_KEY))||[]; }catch(e){}
+  const entry={name,score:s,date:new Date().toLocaleDateString('th-TH'),t:Date.now()};
+  list.push(entry);
+  list.sort((a,b)=>b.score-a.score);
+  list=list.slice(0,10);
+  try{ localStorage.setItem(LS_KEY,JSON.stringify(list)); }catch(e){}
+  window._lastEntry=entry;
+}
+function renderBoard(tableId){
+  let list=[]; try{ list=JSON.parse(localStorage.getItem(LS_KEY))||[]; }catch(e){}
+  const t=document.getElementById(tableId); if(!t) return;
+  if(list.length===0){ t.innerHTML='<tr><td>ยังไม่มีคะแนน มาเป็นคนแรกกันเถอะ! 🎉</td></tr>'; return; }
+  const medal=['🥇','🥈','🥉'];
+  t.innerHTML=list.map((e,i)=>{
+    const me=(window._lastEntry&&e.t===window._lastEntry.t)?'class="me"':'';
+    return `<tr ${me}><td class="rk">${medal[i]||(i+1)}</td><td>${escapeHtml(e.name)}</td><td>${e.date}</td><td style="text-align:right;font-weight:900">${e.score}</td></tr>`;
+  }).join('');
+}
+function escapeHtml(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* ============ CANVAS HELPERS ============ */
+function resize(){
+  const w=document.getElementById('wrap');
+  W=overlay.width=w.clientWidth; H=overlay.height=w.clientHeight;
+}
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+function shade(hex,amt){
+  let c=hex.replace('#',''); if(c.length===3)c=c.split('').map(x=>x+x).join('');
+  let n=parseInt(c,16), r=(n>>16)+amt,g=((n>>8)&255)+amt,b=(n&255)+amt;
+  r=Math.max(0,Math.min(255,r));g=Math.max(0,Math.min(255,g));b=Math.max(0,Math.min(255,b));
+  return '#'+((r<<16)|(g<<8)|b).toString(16).padStart(6,'0');
+}
+
+/* ============ SOUND ============ */
+let actx;
+function beep(freq,dur){
+  try{
+    actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+    const o=actx.createOscillator(),g=actx.createGain();
+    o.frequency.value=freq; o.type='triangle';
+    o.connect(g); g.connect(actx.destination);
+    g.gain.setValueAtTime(0.18,actx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+dur);
+    o.start(); o.stop(actx.currentTime+dur);
+  }catch(e){}
+}
+
+/* init boards */
+renderBoard('boardTable2');
+</script>
 </body>
 </html>
-
-```
