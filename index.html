@@ -149,7 +149,7 @@
     </div>
     <div class="relative flex items-center justify-center w-full max-w-[640px] aspect-[4/3] rounded-3xl overflow-hidden border-4 border-purple-500 bg-black shadow-2xl">
       <video id="webcamVideo" class="hidden" width="640" height="480" playsinline autoplay muted></video>
-      <canvas id="calibrationCanvas" class="w-full h-full mirrored absolute inset-0 z-0"></canvas>
+      <canvas id="calibrationCanvas" class="w-full h-full absolute inset-0 z-0"></canvas>
       <div id="silhouetteOverlay" class="absolute inset-0 border-4 border-dashed border-yellow-400/50 flex flex-col items-center justify-center pointer-events-none z-10 bg-black/30">
         <svg class="w-1/2 h-2/3 text-pink-400/40" viewBox="0 0 100 100" fill="currentColor">
           <circle cx="50" cy="25" r="12" />
@@ -176,7 +176,7 @@
 
   <!-- ================= MAIN GAME SCREEN ================= -->
   <div id="gameScreen" class="hidden absolute inset-0 z-20 w-full h-full overflow-hidden bg-slate-950">
-    <canvas id="gameCanvas" class="w-full h-full mirrored absolute inset-0 z-0"></canvas>
+    <canvas id="gameCanvas" class="w-full h-full absolute inset-0 z-0"></canvas>
     <div class="absolute top-4 left-4 right-4 z-10 flex justify-between items-center pointer-events-none gap-4">
       <div class="bg-yellow-400/95 border-4 border-yellow-500 px-4 py-2 rounded-2xl shadow-lg flex items-center gap-2 pointer-events-auto transform hover:scale-105 transition-all">
         <span class="text-3xl">🏆</span>
@@ -444,8 +444,8 @@
       answerBoxes = [];
       const qData = currentQuestionsList[currentQuestionIndex];
       const count = qData.options.length;
-      const boxWidth = 140;
-      const boxHeight = 100;
+      const boxWidth = 120;
+      const boxHeight = 135;
       const speedMag = SPEED_MULTIPLIERS[settings.speed];
       // ใช้ขนาด canvas ที่แท้จริง (resize แล้วใน initGameSession) เพื่อไม่ให้กล่องวางเพี้ยน
       const screenW = gameCanvas.width || window.innerWidth;
@@ -607,7 +607,8 @@
     }
 
     // --- ตรวจสอบพิกัดการแตะ ---
-    const HIT_RADIUS = 35;
+    const HIT_RADIUS = 60;   // ขยายพื้นที่รอบมือให้แตะโดนง่ายขึ้น (เดิม 35)
+    const HOLD_TIME = 0.3;   // เวลาแตะค้างเพื่อยืนยัน (เดิม 0.5) — โหลดเร็วขึ้น
     let particleSystems = [];
 
     function spawnParticles(x, y, color) {
@@ -640,7 +641,7 @@
           if (Math.floor(box.touchTimer * 10) !== Math.floor(prevTimer * 10)) {
             playAudio('tick');
           }
-          if (box.touchTimer >= 0.5) { processAnswer(box); }
+          if (box.touchTimer >= HOLD_TIME) { processAnswer(box); }
         } else {
           box.isBeingTouched = false;
           box.touchTimer = 0;
@@ -747,7 +748,8 @@
 
       let detectedHands = [];
       if (rawLandmarks) {
-        const keypoints = [15, 16, 17, 18, 19, 20];
+        // ใช้เฉพาะข้อมือซ้าย (15) และข้อมือขวา (16) ข้างละ 1 จุด — ไม่รก ไม่ไวเกิน
+        const keypoints = [15, 16];
         keypoints.forEach(idx => {
           const lm = rawLandmarks[idx];
           if (lm && lm.visibility > 0.4) {
@@ -788,12 +790,59 @@
         gCtx.fillStyle = box.isBeingTouched ? '#fbcfe8' : box.color.bg;
         gCtx.strokeStyle = box.isBeingTouched ? '#db2777' : box.color.border;
         gCtx.lineWidth = box.isBeingTouched ? 8 : 4;
+        // ===== วาดรูปจรวด 🚀 =====
+        const hw = box.width / 2;
+        const hh = box.height / 2;
+        const bodyColor = box.isBeingTouched ? '#fbcfe8' : box.color.bg;
+        const edgeColor = box.isBeingTouched ? '#db2777' : box.color.border;
+
+        // เปลวไฟท้ายจรวด (กระพริบ) วาดก่อนให้อยู่ด้านหลัง
+        const flameFlicker = 0.6 + Math.abs(Math.sin(now / 90)) * 0.4;
+        gCtx.save();
+        gCtx.shadowBlur = 0;
         gCtx.beginPath();
-        // fallback หาก roundRect ไม่รองรับบนเครื่องรุ่นเก่า
+        gCtx.moveTo(-hw * 0.30, hh * 0.55);
+        gCtx.lineTo(0, hh * 0.55 + hh * 0.95 * flameFlicker);
+        gCtx.lineTo(hw * 0.30, hh * 0.55);
+        gCtx.closePath();
+        gCtx.fillStyle = '#f59e0b';
+        gCtx.fill();
+        gCtx.beginPath();
+        gCtx.moveTo(-hw * 0.16, hh * 0.55);
+        gCtx.lineTo(0, hh * 0.55 + hh * 0.6 * flameFlicker);
+        gCtx.lineTo(hw * 0.16, hh * 0.55);
+        gCtx.closePath();
+        gCtx.fillStyle = '#fde047';
+        gCtx.fill();
+        gCtx.restore();
+
+        // ครีบซ้าย-ขวา
+        gCtx.fillStyle = edgeColor;
+        gCtx.beginPath();
+        gCtx.moveTo(-hw * 0.42, hh * 0.10);
+        gCtx.lineTo(-hw * 0.90, hh * 0.60);
+        gCtx.lineTo(-hw * 0.42, hh * 0.60);
+        gCtx.closePath();
+        gCtx.fill();
+        gCtx.beginPath();
+        gCtx.moveTo(hw * 0.42, hh * 0.10);
+        gCtx.lineTo(hw * 0.90, hh * 0.60);
+        gCtx.lineTo(hw * 0.42, hh * 0.60);
+        gCtx.closePath();
+        gCtx.fill();
+
+        // ลำตัวจรวด (แคปซูล หัวมนเป็นจมูกจรวด)
+        gCtx.fillStyle = bodyColor;
+        gCtx.strokeStyle = edgeColor;
+        gCtx.lineWidth = box.isBeingTouched ? 6 : 4;
+        const bodyW = hw * 0.95;
+        const bodyTop = -hh * 0.60;
+        const bodyH = hh * 1.20;
+        gCtx.beginPath();
         if (gCtx.roundRect) {
-          gCtx.roundRect(-box.width / 2, -box.height / 2, box.width, box.height, 20);
+          gCtx.roundRect(-bodyW / 2, bodyTop, bodyW, bodyH, [bodyW / 2, bodyW / 2, 14, 14]);
         } else {
-          gCtx.rect(-box.width / 2, -box.height / 2, box.width, box.height);
+          gCtx.rect(-bodyW / 2, bodyTop, bodyW, bodyH);
         }
         gCtx.fill();
         gCtx.stroke();
@@ -802,16 +851,16 @@
           gCtx.strokeStyle = '#22c55e';
           gCtx.lineWidth = 10;
           gCtx.beginPath();
-          const pct = box.touchTimer / 0.5;
+          const pct = box.touchTimer / HOLD_TIME;
           gCtx.arc(0, 0, Math.min(box.width, box.height) / 2.3, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * pct));
           gCtx.stroke();
         }
         gCtx.shadowBlur = 0;
         gCtx.fillStyle = box.isBeingTouched ? '#9d174d' : box.color.text;
-        gCtx.font = 'bold 44px Itim, Kanit';
+        gCtx.font = 'bold 40px Itim, Kanit';
         gCtx.textAlign = 'center';
         gCtx.textBaseline = 'middle';
-        gCtx.fillText(box.text, 0, 0);
+        gCtx.fillText(box.text, 0, hh * 0.15); // เลื่อนลงมาอยู่กลางลำตัวจรวด
         gCtx.restore();
       });
 
@@ -901,7 +950,7 @@
           mouseX >= box.x && mouseX <= box.x + box.width &&
           mouseY >= box.y && mouseY <= box.y + box.height
         ) {
-          box.touchTimer = 0.5;
+          box.touchTimer = HOLD_TIME;
           processAnswer(box);
         }
       });
